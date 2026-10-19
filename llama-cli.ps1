@@ -6,7 +6,7 @@ $root = $PSScriptRoot
 $exe = Join-Path $root 'bin\llama-cli.exe'
 $modelDir = Join-Path $root 'models'
 $settingsFile = Join-Path $root 'llama-cli-settings.json'
-$contextSize = 6144
+$contextSize = 4096
 $batchSize = 512
 $microBatchSize = 128
 
@@ -73,30 +73,20 @@ $selectedModel = $models[$selectedIndex]
     ConvertTo-Json |
     Set-Content -LiteralPath $settingsFile -Encoding UTF8
 
-# The tested Q4_K_M Gemma 4 E2B model has large embedding tensors that
-# llama.cpp normally leaves in system RAM. Explicitly send them to CUDA0.
-# Do NOT force this for Q5/Q6: their weights exceed practical 4 GiB VRAM capacity.
-$fullGpuQ4 = $selectedModel.Name -eq 'google_gemma-4-E2B-it-Q4_K_M.gguf'
-
+# Default GPU placement: keep the large Gemma 4 embedding tensors in RAM.
+# On the tested Q4 model this uses about 1450 MiB VRAM for model weights.
+# Do not force --override-tensor: it previously filled almost all 4 GB VRAM.
 $arguments = @(
     '-m', $selectedModel.FullName,
-    '--gpu-layers', 'all',
+    '--gpu-layers', 'auto',
+    '--fit', 'on',
     '-c', [string]$contextSize,
     '-b', [string]$batchSize,
     '-ub', [string]$microBatchSize
 )
 
-if ($fullGpuQ4) {
-    $arguments += @('--fit', 'off', '--override-tensor', 'token_embd\.weight=CUDA0')
-    Write-Host ''
-    Write-Host 'GPU mode: Q4 embedding weights forced to CUDA0' -ForegroundColor Yellow
-    Write-Host 'WARNING: 6144 context may run out of VRAM on a 4 GB GPU.' -ForegroundColor Yellow
-} else {
-    $arguments += @('--fit', 'on')
-    Write-Host ''
-    Write-Host 'GPU mode: automatic memory fitting (larger model)' -ForegroundColor Yellow
-}
-
+Write-Host ''
+Write-Host 'GPU mode: automatic; embedding weights not forced into VRAM' -ForegroundColor Yellow
 Write-Host "Starting: $($selectedModel.Name)" -ForegroundColor Green
 Write-Host "Model path: $($selectedModel.FullName)"
 Write-Host "Context: $contextSize | batch: $batchSize | microbatch: $microBatchSize"
