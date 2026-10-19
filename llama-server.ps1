@@ -1,4 +1,4 @@
-# llama.cpp server launcher - Windows PowerShell 5.1 / PowerShell 7+
+﻿# llama.cpp server launcher - Windows PowerShell 5.1 / PowerShell 7+
 # Save as C:\llama.cpp\llama-server.ps1
 $ErrorActionPreference = 'Stop'
 
@@ -9,7 +9,9 @@ $settingsFile = Join-Path $root 'llama-server-settings.json'
 $cliSettingsFile = Join-Path $root 'llama-cli-settings.json'
 $hostAddress = '127.0.0.1' # Use 0.0.0.0 only when you intend to allow LAN access
 $port = 8080
-$contextSize = 6144
+$contextSize = 4096
+$batchSize = 512
+$microBatchSize = 128
 $serverUrl = "http://127.0.0.1:$port"
 
 if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw "Missing server: $exe" }
@@ -86,7 +88,7 @@ $selectedModel = $models[$selectedIndex]
 
 $modeLabel = if ($apiOnly) { 'API only' } else { 'Web UI + API' }
 Write-Host "`nStarting server with: $($selectedModel.Name)" -ForegroundColor Green
-Write-Host "Mode: $modeLabel | URL: $serverUrl | Context: $contextSize | GPU layers: auto"
+Write-Host "Mode: $modeLabel | URL: $serverUrl | Context: $contextSize | batch: $batchSize | microbatch: $microBatchSize | GPU layers: auto"
 Write-Host 'The server opens in a separate console window.'
 
 # Start executable directly; no cmd.exe quoting problems.
@@ -96,7 +98,9 @@ $arguments = @(
     '--port', "$port",
     '--gpu-layers', 'auto',
     '--fit', 'on',
-    '-c', "$contextSize"
+    '-c', "$contextSize",
+    '-b', "$batchSize",
+    '-ub', "$microBatchSize"
 )
 if ($apiOnly) { $arguments += '--no-webui' }
 
