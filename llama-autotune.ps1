@@ -1,4 +1,4 @@
-# llama.cpp local server autotuner - Windows PowerShell 5.1 / PowerShell 7+
+﻿# llama.cpp local server autotuner - Windows PowerShell 5.1 / PowerShell 7+
 # Run from C:\llama.cpp (or place script beside the bin and models folders).
 # Runs until the configured time budget is reached, or all configurations have
 # been tested with enough repetitions. Does not modify model files or launchers.
@@ -113,10 +113,8 @@ function Start-BenchServer {
         '-c', '4096', '-b', '512', '-ub', [string]$cfg.UBatch,
         '-t', [string]$cfg.Threads, '--cache-ram', '0'
     )
-    # Keep Qwen in non-thinking mode to compare useful visible responses.
-    if ($model.Name -match 'Qwen3') {
-        $args += @('--reasoning', 'off', '--reasoning-budget', '0')
-    }
+    # All models must use non-thinking mode for comparable visible answers.
+    $args += @('--reasoning', 'off', '--reasoning-budget', '0')
     $script:serverProcess = Start-Process -FilePath $script:exe -ArgumentList $args -WorkingDirectory (Join-Path $script:root 'bin') -PassThru -WindowStyle Hidden -RedirectStandardOutput $stdout -RedirectStandardError $stderr
     return (Wait-Ready -Seconds $script:StartTimeoutSec)
 }
@@ -129,7 +127,7 @@ function Invoke-Test {
         stream = $false
         temperature = 0
         seed = 2003
-        max_tokens = 96
+        max_tokens = 192
         cache_prompt = $false
     } | ConvertTo-Json -Depth 6 -Compress
     $watch = [Diagnostics.Stopwatch]::StartNew()
@@ -157,9 +155,12 @@ function Invoke-Test {
         if ($resp.choices -and $resp.choices.Count -gt 0 -and $resp.choices[0].message) {
             $responseText = [string]$resp.choices[0].message.content
         }
-        if ([string]::IsNullOrWhiteSpace($responseText) -and $phase -ne 'warmup') {
+        if ([string]::IsNullOrWhiteSpace($responseText)) {
             $ok = $false
-            $err = 'Empty visible answer'
+            $err = 'Empty visible answer (possibly reasoning-only)'
+        } elseif ($resp.choices[0].finish_reason -eq 'length') {
+            $ok = $false
+            $err = 'Truncated at max_tokens before completion'
         }
     }
     return [pscustomobject]@{

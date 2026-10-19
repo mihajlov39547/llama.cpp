@@ -5,3 +5,4 @@ bin/LICENSE-LLVM-OpenMP
 .venv/
 .powershell/
 benchmark-results/
+__pycache__/
