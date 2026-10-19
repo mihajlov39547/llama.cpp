@@ -85,6 +85,14 @@ $arguments = @(
     '-ub', [string]$microBatchSize
 )
 
+# Disable thinking for Qwen3 and Qwen3.5
+if ($selectedModel.Name -match 'Qwen3') {
+    $arguments += @(
+        '--reasoning', 'off',
+        '--reasoning-budget', '0'
+    )
+}
+
 Write-Host ''
 Write-Host 'GPU mode: automatic; embedding weights not forced into VRAM' -ForegroundColor Yellow
 Write-Host "Starting: $($selectedModel.Name)" -ForegroundColor Green
