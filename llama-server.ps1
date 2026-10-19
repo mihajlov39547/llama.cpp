@@ -77,8 +77,8 @@ Write-Host "`nStarting server with: $($selectedModel.Name)" -ForegroundColor Gre
 Write-Host "URL: $serverUrl | Context: $contextSize | GPU layers: auto"
 Write-Host 'The server opens in a separate console window.'
 
-# Keep stderr/stdout attached to that console for easy diagnostics.
-# Start-Process with -PassThru allows checking whether loading failed.
+# Start executable directly. Passing through cmd.exe /k breaks paths with quotes.
+# Windows opens a separate console for a console executable launched via Start-Process.
 $arguments = @(
     '-m', ('"' + $selectedModel.FullName + '"'),
     '--host', $hostAddress,
@@ -86,9 +86,8 @@ $arguments = @(
     '--gpu-layers', 'auto',
     '--fit', 'on',
     '-c', "$contextSize"
-) -join ' '
-$cmd = '"' + $exe + '" ' + $arguments
-$process = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/k', $cmd) -WorkingDirectory (Join-Path $root 'bin') -PassThru
+)
+$process = Start-Process -FilePath $exe -ArgumentList $arguments -WorkingDirectory (Join-Path $root 'bin') -PassThru
 
 Write-Host 'Waiting for the server to become ready (up to 120 seconds)...'
 $ready = $false
@@ -106,11 +105,17 @@ if (-not $ready) {
     exit 1
 }
 
-$chromePaths = @(
-    (Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'),
-    (Join-Path ${env:ProgramFiles(x86)} 'Google\Chrome\Application\chrome.exe'),
-    (Join-Path $env:LocalAppData 'Google\Chrome\Application\chrome.exe')
-) | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) }
+$chromeCandidates = @()
+if ($env:ProgramFiles) {
+    $chromeCandidates += (Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe')
+}
+if (${env:ProgramFiles(x86)}) {
+    $chromeCandidates += (Join-Path ${env:ProgramFiles(x86)} 'Google\Chrome\Application\chrome.exe')
+}
+if ($env:LocalAppData) {
+    $chromeCandidates += (Join-Path $env:LocalAppData 'Google\Chrome\Application\chrome.exe')
+}
+$chromePaths = @($chromeCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })
 
 Write-Host "Server ready: $serverUrl" -ForegroundColor Green
 if ($chromePaths.Count -gt 0) {
