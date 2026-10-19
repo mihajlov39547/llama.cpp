@@ -1,41 +1,42 @@
 # llama.cpp CLI launcher - PowerShell 5.1 / 7+
-# Put this script in C:\llama.cpp\llama-cli.ps1.
+# Save as C:\llama.cpp\llama-cli.ps1
 $ErrorActionPreference = 'Stop'
 
 $root = $PSScriptRoot
 $exe = Join-Path $root 'bin\llama-cli.exe'
 $modelDir = Join-Path $root 'models'
 $settingsFile = Join-Path $root 'llama-cli-settings.json'
+$contextSize = 6144
+$batchSize = 512
+$microBatchSize = 128
 
 if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) {
-    Write-Host "Executable not found: $exe" -ForegroundColor Red
-    exit 1
+    throw "Executable not found: $exe"
 }
 if (-not (Test-Path -LiteralPath $modelDir -PathType Container)) {
-    Write-Host "Models folder not found: $modelDir" -ForegroundColor Red
-    exit 1
+    throw "Models folder not found: $modelDir"
 }
 
 $models = @(Get-ChildItem -LiteralPath $modelDir -Filter '*.gguf' -File -Recurse |
     Sort-Object FullName)
 if ($models.Count -eq 0) {
-    Write-Host "No GGUF models found in $modelDir" -ForegroundColor Yellow
-    exit 1
+    throw "No GGUF models found in $modelDir"
 }
 
 $lastModel = $null
 if (Test-Path -LiteralPath $settingsFile -PathType Leaf) {
     try {
         $settings = Get-Content -LiteralPath $settingsFile -Raw | ConvertFrom-Json
-        $lastModel = [string]$settings.lastModel
+        if ($settings.lastModel) { $lastModel = [string]$settings.lastModel }
     } catch {
-        Write-Warning 'Cannot read saved settings; model selection will use the first model.'
+        Write-Warning 'Cannot read saved settings; using the first model.'
     }
 }
 
 $defaultIndex = 0
 for ($i = 0; $i -lt $models.Count; $i++) {
-    if ($models[$i].FullName -eq $lastModel) {
+    if ([string]::Equals($models[$i].FullName, $lastModel,
+            [StringComparison]::OrdinalIgnoreCase)) {
         $defaultIndex = $i
         break
     }
@@ -59,7 +60,8 @@ while ($true) {
         break
     }
     $number = 0
-    if ([int]::TryParse($answer, [ref]$number) -and $number -ge 1 -and $number -le $models.Count) {
+    if ([int]::TryParse($answer, [ref]$number) -and
+        $number -ge 1 -and $number -le $models.Count) {
         $selectedIndex = $number - 1
         break
     }
@@ -67,21 +69,43 @@ while ($true) {
 }
 
 $selectedModel = $models[$selectedIndex]
-# Save preference before launch, so it persists even if the user interrupts the CLI.
 @{ lastModel = $selectedModel.FullName } |
     ConvertTo-Json |
     Set-Content -LiteralPath $settingsFile -Encoding UTF8
 
-Write-Host ''
+# The tested Q4_K_M Gemma 4 E2B model has large embedding tensors that
+# llama.cpp normally leaves in system RAM. Explicitly send them to CUDA0.
+# Do NOT force this for Q5/Q6: their weights exceed practical 4 GiB VRAM capacity.
+$fullGpuQ4 = $selectedModel.Name -eq 'google_gemma-4-E2B-it-Q4_K_M.gguf'
+
+$arguments = @(
+    '-m', $selectedModel.FullName,
+    '--gpu-layers', 'all',
+    '-c', [string]$contextSize,
+    '-b', [string]$batchSize,
+    '-ub', [string]$microBatchSize
+)
+
+if ($fullGpuQ4) {
+    $arguments += @('--fit', 'off', '--override-tensor', 'token_embd\.weight=CUDA0')
+    Write-Host ''
+    Write-Host 'GPU mode: Q4 embedding weights forced to CUDA0' -ForegroundColor Yellow
+    Write-Host 'WARNING: 6144 context may run out of VRAM on a 4 GB GPU.' -ForegroundColor Yellow
+} else {
+    $arguments += @('--fit', 'on')
+    Write-Host ''
+    Write-Host 'GPU mode: automatic memory fitting (larger model)' -ForegroundColor Yellow
+}
+
 Write-Host "Starting: $($selectedModel.Name)" -ForegroundColor Green
 Write-Host "Model path: $($selectedModel.FullName)"
-Write-Host 'GPU: automatic | context: 4096'
-Write-Host 'Press Ctrl+C to stop the model.'
+Write-Host "Context: $contextSize | batch: $batchSize | microbatch: $microBatchSize"
+Write-Host 'Press Ctrl+C to stop.'
 Write-Host ''
 
 Push-Location (Join-Path $root 'bin')
 try {
-    & $exe -m $selectedModel.FullName --gpu-layers auto --fit on -c 4096
+    & $exe @arguments
 } finally {
     Pop-Location
 }
