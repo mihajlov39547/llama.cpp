@@ -1,0 +1,6 @@
+models/*.gguf
+bin/*.dll
+bin/*.exe
+bin/LICENSE-LLVM-OpenMP
+.venv/
+.powershell/
