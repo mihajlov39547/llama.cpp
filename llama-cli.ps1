@@ -1,4 +1,4 @@
-# llama.cpp CLI launcher - PowerShell 5.1 / 7+
+﻿# llama.cpp CLI launcher - PowerShell 5.1 / 7+
 # Save as C:\llama.cpp\llama-cli.ps1
 $ErrorActionPreference = 'Stop'
 
@@ -73,28 +73,52 @@ $selectedModel = $models[$selectedIndex]
     ConvertTo-Json |
     Set-Content -LiteralPath $settingsFile -Encoding UTF8
 
-# Default GPU placement: keep the large Gemma 4 embedding tensors in RAM.
-# On the tested Q4 model this uses about 1450 MiB VRAM for model weights.
-# Do not force --override-tensor: it previously filled almost all 4 GB VRAM.
+# Benchmark-validated profiles for the GTX 1650 Ti (4 GiB), October 2026.
+# Exact filename matching ensures other models retain the original safe defaults.
+$gpuLayers = 'auto'
+$cpuThreads = $null
+$microBatchSize = 128
+$cacheTypeK = $null
+$cacheTypeV = $null
+$disableReasoning = ($selectedModel.Name -match 'Qwen3')
+$profileName = 'Default (untested model)'
+switch -Regex ($selectedModel.Name) {
+    '^google_gemma-4-E2B-it-Q4_K_M\.gguf$' {
+        $gpuLayers = 'auto'; $cpuThreads = 4; $microBatchSize = 128
+        $cacheTypeK = 'f16'; $cacheTypeV = 'f16'
+        $disableReasoning = $true
+        $profileName = 'Gemma 4 E2B benchmark profile'
+        break
+    }
+    '^Qwen3\.5-4B-Q4_K_M\.gguf$' {
+        $gpuLayers = 'all'; $cpuThreads = 6; $microBatchSize = 256
+        $cacheTypeK = 'f16'; $cacheTypeV = 'f16'
+        $disableReasoning = $true
+        $profileName = 'Qwen3.5 4B benchmark profile'
+        break
+    }
+    '^Qwen3-4B-Q4_K_M\.gguf$' {
+        $gpuLayers = 'all'; $cpuThreads = 6; $microBatchSize = 256
+        $cacheTypeK = 'q8_0'; $cacheTypeV = 'q8_0'
+        $disableReasoning = $true
+        $profileName = 'Qwen3 4B balanced VRAM profile'
+        break
+    }
+}
 $arguments = @(
     '-m', $selectedModel.FullName,
-    '--gpu-layers', 'auto',
+    '--gpu-layers', $gpuLayers,
     '--fit', 'on',
     '-c', [string]$contextSize,
     '-b', [string]$batchSize,
     '-ub', [string]$microBatchSize
 )
-
-# Disable thinking for Qwen3 and Qwen3.5
-if ($selectedModel.Name -match 'Qwen3') {
-    $arguments += @(
-        '--reasoning', 'off',
-        '--reasoning-budget', '0'
-    )
-}
+if ($null -ne $cpuThreads) { $arguments += @('-t', [string]$cpuThreads) }
+if ($cacheTypeK) { $arguments += @('--cache-type-k', $cacheTypeK, '--cache-type-v', $cacheTypeV) }
+if ($disableReasoning) { $arguments += @('--reasoning', 'off', '--reasoning-budget', '0') }
 
 Write-Host ''
-Write-Host 'GPU mode: automatic; embedding weights not forced into VRAM' -ForegroundColor Yellow
+Write-Host "Profile: $profileName | GPU layers: $gpuLayers | threads: $(if ($null -eq $cpuThreads) { 'default' } else { $cpuThreads }) | KV: $(if ($cacheTypeK) { $cacheTypeK } else { 'default' })" -ForegroundColor Yellow
 Write-Host "Starting: $($selectedModel.Name)" -ForegroundColor Green
 Write-Host "Model path: $($selectedModel.FullName)"
 Write-Host "Context: $contextSize | batch: $batchSize | microbatch: $microBatchSize"

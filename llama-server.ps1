@@ -84,11 +84,45 @@ try {
 }
 
 $selectedModel = $models[$selectedIndex]
+# Benchmark-validated profiles for the GTX 1650 Ti (4 GiB), October 2026.
+# Exact filename matching ensures other models retain the original safe defaults.
+$gpuLayers = 'auto'
+$cpuThreads = $null
+$microBatchSize = 128
+$cacheTypeK = $null
+$cacheTypeV = $null
+$disableReasoning = ($selectedModel.Name -match 'Qwen3')
+$profileName = 'Default (untested model)'
+switch -Regex ($selectedModel.Name) {
+    '^google_gemma-4-E2B-it-Q4_K_M\.gguf$' {
+        $gpuLayers = 'auto'; $cpuThreads = 4; $microBatchSize = 128
+        $cacheTypeK = 'f16'; $cacheTypeV = 'f16'
+        $disableReasoning = $true
+        $profileName = 'Gemma 4 E2B benchmark profile'
+        break
+    }
+    '^Qwen3\.5-4B-Q4_K_M\.gguf$' {
+        $gpuLayers = 'all'; $cpuThreads = 6; $microBatchSize = 256
+        $cacheTypeK = 'f16'; $cacheTypeV = 'f16'
+        $disableReasoning = $true
+        $profileName = 'Qwen3.5 4B benchmark profile'
+        break
+    }
+    '^Qwen3-4B-Q4_K_M\.gguf$' {
+        $gpuLayers = 'all'; $cpuThreads = 6; $microBatchSize = 256
+        $cacheTypeK = 'q8_0'; $cacheTypeV = 'q8_0'
+        $disableReasoning = $true
+        $profileName = 'Qwen3 4B balanced VRAM profile'
+        break
+    }
+}
+
 @{ lastModel = $selectedModel.FullName } | ConvertTo-Json | Set-Content -LiteralPath $settingsFile -Encoding UTF8
 
 $modeLabel = if ($apiOnly) { 'API only' } else { 'Web UI + API' }
 Write-Host "`nStarting server with: $($selectedModel.Name)" -ForegroundColor Green
-Write-Host "Mode: $modeLabel | URL: $serverUrl | Context: $contextSize | batch: $batchSize | microbatch: $microBatchSize | GPU layers: auto"
+Write-Host "Mode: $modeLabel | URL: $serverUrl | Context: $contextSize | batch: $batchSize | microbatch: $microBatchSize | GPU layers: $gpuLayers | threads: $(if ($null -eq $cpuThreads) { 'default' } else { $cpuThreads }) | KV: $(if ($cacheTypeK) { $cacheTypeK } else { 'default' })"
+Write-Host "Profile: $profileName" -ForegroundColor Yellow
 Write-Host 'The server opens in a separate console window.'
 
 # Start executable directly; no cmd.exe quoting problems.
@@ -96,12 +130,15 @@ $arguments = @(
     '-m', ('"' + $selectedModel.FullName + '"'),
     '--host', $hostAddress,
     '--port', "$port",
-    '--gpu-layers', 'auto',
+    '--gpu-layers', $gpuLayers,
     '--fit', 'on',
     '-c', "$contextSize",
     '-b', "$batchSize",
     '-ub', "$microBatchSize"
 )
+if ($null -ne $cpuThreads) { $arguments += @('-t', [string]$cpuThreads) }
+if ($cacheTypeK) { $arguments += @('--cache-type-k', $cacheTypeK, '--cache-type-v', $cacheTypeV) }
+if ($disableReasoning) { $arguments += @('--reasoning', 'off', '--reasoning-budget', '0') }
 if ($apiOnly) { $arguments += '--no-webui' }
 
 $process = Start-Process -FilePath $exe -ArgumentList $arguments -WorkingDirectory (Join-Path $root 'bin') -PassThru
