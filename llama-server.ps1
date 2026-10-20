@@ -85,6 +85,7 @@ try {
 
 $selectedModel = $models[$selectedIndex]
 # Benchmark-validated profiles for the GTX 1650 Ti (4 GiB), October 2026.
+# TranslateGemma uses initial, unbenchmarked settings for the same GPU.
 # Exact filename matching ensures other models retain the original safe defaults.
 $gpuLayers = 'auto'
 $cpuThreads = $null
@@ -93,7 +94,17 @@ $cacheTypeK = $null
 $cacheTypeV = $null
 $disableReasoning = ($selectedModel.Name -match 'Qwen3')
 $profileName = 'Default (untested model)'
+$chatTemplateArguments = @()
 switch -Regex ($selectedModel.Name) {
+    '^translategemma-4b-it-Q4_K_M\.gguf$' {
+        $gpuLayers = 'all'; $cpuThreads = 4; $contextSize = 4096
+        $batchSize = 512; $microBatchSize = 128
+        $cacheTypeK = 'f16'; $cacheTypeV = 'f16'
+        $disableReasoning = $false
+        $chatTemplateArguments = @('--no-jinja', '--chat-template', 'gemma')
+        $profileName = 'TranslateGemma 4B Q4_K_M (translation, unbenchmarked)'
+        break
+    }
     '^google_gemma-4-E2B-it-Q4_K_M\.gguf$' {
         $gpuLayers = 'auto'; $cpuThreads = 4; $microBatchSize = 128
         $cacheTypeK = 'f16'; $cacheTypeV = 'f16'
@@ -123,6 +134,7 @@ $modeLabel = if ($apiOnly) { 'API only' } else { 'Web UI + API' }
 Write-Host "`nStarting server with: $($selectedModel.Name)" -ForegroundColor Green
 Write-Host "Mode: $modeLabel | URL: $serverUrl | Context: $contextSize | batch: $batchSize | microbatch: $microBatchSize | GPU layers: $gpuLayers | threads: $(if ($null -eq $cpuThreads) { 'default' } else { $cpuThreads }) | KV: $(if ($cacheTypeK) { $cacheTypeK } else { 'default' })"
 Write-Host "Profile: $profileName" -ForegroundColor Yellow
+Write-Host "Chat template: $(if ($chatTemplateArguments.Count) { $chatTemplateArguments -join ' ' } else { 'default (model metadata)' })"
 Write-Host 'The server opens in a separate console window.'
 
 # Start executable directly; no cmd.exe quoting problems.
@@ -139,8 +151,10 @@ $arguments = @(
 if ($null -ne $cpuThreads) { $arguments += @('-t', [string]$cpuThreads) }
 if ($cacheTypeK) { $arguments += @('--cache-type-k', $cacheTypeK, '--cache-type-v', $cacheTypeV) }
 if ($disableReasoning) { $arguments += @('--reasoning', 'off', '--reasoning-budget', '0') }
+$arguments += $chatTemplateArguments
 if ($apiOnly) { $arguments += '--no-webui' }
 
+Write-Host ('Command: & "{0}" {1}' -f $exe, ($arguments -join ' '))
 $process = Start-Process -FilePath $exe -ArgumentList $arguments -WorkingDirectory (Join-Path $root 'bin') -PassThru
 
 Write-Host 'Waiting for the server to become ready (up to 120 seconds)...'

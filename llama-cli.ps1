@@ -74,6 +74,7 @@ $selectedModel = $models[$selectedIndex]
     Set-Content -LiteralPath $settingsFile -Encoding UTF8
 
 # Benchmark-validated profiles for the GTX 1650 Ti (4 GiB), October 2026.
+# TranslateGemma is a separate, unbenchmarked translation profile.
 # Exact filename matching ensures other models retain the original safe defaults.
 $gpuLayers = 'auto'
 $cpuThreads = $null
@@ -82,7 +83,17 @@ $cacheTypeK = $null
 $cacheTypeV = $null
 $disableReasoning = ($selectedModel.Name -match 'Qwen3')
 $profileName = 'Default (untested model)'
+$chatTemplateArguments = @()
 switch -Regex ($selectedModel.Name) {
+    '^translategemma-4b-it-Q4_K_M\.gguf$' {
+        $gpuLayers = 'all'; $cpuThreads = 4; $contextSize = 2048
+        $batchSize = 512; $microBatchSize = 128
+        $cacheTypeK = 'f16'; $cacheTypeV = 'f16'
+        $disableReasoning = $false
+        $chatTemplateArguments = @('--no-jinja', '--chat-template', 'gemma')
+        $profileName = 'TranslateGemma 4B Q4_K_M (translation, unbenchmarked)'
+        break
+    }
     '^google_gemma-4-E2B-it-Q4_K_M\.gguf$' {
         $gpuLayers = 'auto'; $cpuThreads = 4; $microBatchSize = 128
         $cacheTypeK = 'f16'; $cacheTypeV = 'f16'
@@ -116,6 +127,7 @@ $arguments = @(
 if ($null -ne $cpuThreads) { $arguments += @('-t', [string]$cpuThreads) }
 if ($cacheTypeK) { $arguments += @('--cache-type-k', $cacheTypeK, '--cache-type-v', $cacheTypeV) }
 if ($disableReasoning) { $arguments += @('--reasoning', 'off', '--reasoning-budget', '0') }
+$arguments += $chatTemplateArguments
 
 Write-Host ''
 Write-Host "Profile: $profileName | GPU layers: $gpuLayers | threads: $(if ($null -eq $cpuThreads) { 'default' } else { $cpuThreads }) | KV: $(if ($cacheTypeK) { $cacheTypeK } else { 'default' })" -ForegroundColor Yellow
