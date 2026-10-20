@@ -21,7 +21,7 @@ function dom() {
     }
     removeEventListener(type, fn) { this.listeners.get(type)?.delete(fn); }
     emit(type, extra = {}) {
-      const event = { type, target: this, stopPropagation() {}, preventDefault() {}, ...extra };
+      const event = { type, target: this, isTrusted: true, stopPropagation() {}, preventDefault() {}, ...extra };
       return [...(this.listeners.get(type) || [])].map(fn => fn(event));
     }
   }

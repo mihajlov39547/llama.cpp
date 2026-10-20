@@ -29,7 +29,11 @@
   const actions = element('div', '', panel, { class: 'actions' });
   function button(text, parent, action) {
     const node = element('button', text, parent, { type: 'button' });
-    node.addEventListener('click', action);
+    node.addEventListener('click', event => {
+      // A page script can see the open shadow root; synthetic clicks must not
+      // authorize reading/sending a draft, applying text or writing clipboard.
+      if (event.isTrusted) return action(event);
+    });
     return node;
   }
   const apply = button('Apply', actions, applyRewrite);
@@ -41,6 +45,7 @@
   const original = element('textarea', '', recovery, { readonly: '', 'aria-label': 'Original prompt' });
   button('Copy original', recovery, () => copyText(original.value));
   const bar = element('div', '', shadow, { class: 'bar' });
+  element('span', 'Improve Prompt sends this draft to your local AI server (127.0.0.1:8080).', bar, { class: 'disclosure' });
   const improve = button('✦ Improve Prompt', bar, () => start('improve'));
   improve.dataset.promptEnhancerButton = '';
   let editor = null, route = location.href, snapshot = null, rewrite = '';
@@ -64,7 +69,9 @@
       readEditorText(editor) === snapshot.text;
   }
   function update() {
-    improve.disabled = !!pending || applying || !editor || !readEditorText(editor).trim();
+    // Do not inspect the draft merely to disable an empty-state button.
+    // The explicit Improve action validates emptiness before sending anything.
+    improve.disabled = !!pending || applying || !editor;
     improve.textContent = pending ? '◌ Improving…' : '✦ Improve Prompt';
     improve.setAttribute('aria-busy', String(!!pending));
     apply.disabled = !!pending || applying || !rewrite || !current();

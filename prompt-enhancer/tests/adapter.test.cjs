@@ -23,7 +23,8 @@ test('manifest is valid and every declared file exists; classic scripts parse', 
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json')));
   assert.equal(manifest.manifest_version, 3);
   assert.deepEqual(manifest.host_permissions, ['http://127.0.0.1:8080/*']);
-  const files = [manifest.background.service_worker, manifest.options_page, ...Object.values(manifest.icons || {}),
+  const files = [manifest.background.service_worker, manifest.options_page, manifest.action.default_popup,
+    ...Object.values(manifest.action.default_icon), ...Object.values(manifest.icons || {}),
     ...manifest.content_scripts.flatMap(item => item.js),
     ...manifest.web_accessible_resources.flatMap(item => item.resources)];
   for (const file of files) assert.ok(fs.existsSync(path.join(root, file)), file);

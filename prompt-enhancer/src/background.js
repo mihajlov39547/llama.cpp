@@ -18,10 +18,15 @@ function optionsSender(sender) {
   return sender.id === chrome.runtime.id &&
     sender.url === chrome.runtime.getURL('src/options.html');
 }
+function popupSender(sender) {
+  return sender.id === chrome.runtime.id &&
+    sender.url === chrome.runtime.getURL('src/popup.html');
+}
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
-  if (!message || !['PE_IMPROVE', 'PE_REFINE', 'PE_CANCEL', 'PE_TEST'].includes(message.type)) return false;
-  const isTest = message.type === 'PE_TEST';
-  if (isTest ? !optionsSender(sender) : !chatSender(sender)) {
+  if (!message || !['PE_IMPROVE', 'PE_REFINE', 'PE_CANCEL', 'PE_TEST', 'PE_STATUS'].includes(message.type)) return false;
+  const isStatus = message.type === 'PE_STATUS';
+  const isTest = message.type === 'PE_TEST' || isStatus;
+  if (isStatus ? !popupSender(sender) : message.type === 'PE_TEST' ? !optionsSender(sender) : !chatSender(sender)) {
     respond({ ok: false, error: { code: 'SENDER', message: 'Untrusted request source.' } });
     return false;
   }
@@ -29,7 +34,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     respond({ ok: false, error: { code: 'INPUT', message: 'Invalid request ID.' } });
     return false;
   }
-  const key = isTest ? 'options' : sender.tab.id;
+  const key = isStatus ? 'popup' : isTest ? 'options' : sender.tab.id;
   if (message.type === 'PE_CANCEL') {
     const request = active.get(key);
     if (request?.id === message.requestId) {
@@ -58,7 +63,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
         previousImprovement: refining ? message.previousImprovement : undefined
       });
       request.controller.signal.throwIfAborted();
-      respond({ ok: true, ...result });
+      respond({ ok: true, ...result, ...(isTest ? { endpoint: API.settings(settings).baseUrl } : {}) });
     } catch (error) {
       respond({ ok: false, error: request.controller.signal.aborted ?
         { code: 'CANCELLED', message: 'Request cancelled.' } :

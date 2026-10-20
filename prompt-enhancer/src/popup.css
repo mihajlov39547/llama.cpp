@@ -1,0 +1,19 @@
+:root { color-scheme: light dark; font: 13px/1.5 system-ui, sans-serif; }
+body { width: 340px; margin: 0; padding: 18px; box-sizing: border-box; color: light-dark(#173044, #e9f2f7); background: light-dark(#f7fafc, #122332); }
+header, .row { display: flex; align-items: center; gap: 10px; }
+h1 { font-size: 17px; line-height: 1.3; margin: 0; }
+h2 { font-size: 14px; margin: 0; }
+.tagline { margin-top: 12px; }
+section { padding: 12px; border: 1px solid light-dark(#c5d5df, #456070); border-radius: 12px; background: light-dark(#fff, #193344); }
+.row { justify-content: space-between; }
+button, nav a { font: inherit; color: inherit; background: light-dark(#e6f5f3, #204f53); border: 1px solid light-dark(#8ebcb6, #4b9293); border-radius: 7px; padding: 6px 9px; text-decoration: none; cursor: pointer; }
+button:disabled { opacity: .6; cursor: wait; }
+button:focus-visible, a:focus-visible { outline: 2px solid #318ee8; outline-offset: 2px; }
+nav { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+#status { font-weight: 650; margin-bottom: 4px; }
+#status[data-state="connected"] { color: light-dark(#086658, #87ead2); }
+#status[data-state="disconnected"] { color: light-dark(#a12b27, #ffb2ab); }
+#model, #detail, code { overflow-wrap: anywhere; }
+#model { margin: 4px 0; }
+#version, .muted { color: light-dark(#546976, #adc4d1); font-size: 12px; }
+[hidden] { display: none !important; }

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Local Prompt Enhancer — Setup Guide</title>
+  <link rel="stylesheet" href="setup.css">
+</head>
+<body>
+  <main>
+    <header><img src="../icons/icon48.png" width="48" height="48" alt=""><h1>Set up Local Prompt Enhancer</h1></header>
+    <p>Improve your prompts with local AI. This extension currently works with the ChatGPT composer at chatgpt.com.</p>
+    <h2>1. Get llama.cpp and a model</h2>
+    <p>Install or build llama.cpp for your operating system and obtain a compatible GGUF model that your hardware can run. Follow the <a href="https://github.com/ggml-org/llama.cpp/tree/master/tools/server" target="_blank" rel="noopener noreferrer">official llama.cpp server documentation</a>. The extension does not install software or download models.</p>
+    <h2>2. Start the local server</h2>
+    <p>Run the server on this same computer, bound to <code>127.0.0.1:8080</code>. Replace the example model path with your own. Use the executable path for your installation if it is not on PATH.</p>
+    <h3>macOS / Linux terminal</h3>
+    <pre><code>llama-server -m "/path/to/model.gguf" --host 127.0.0.1 --port 8080</code></pre>
+    <h3>Windows PowerShell (from the executable's directory)</h3>
+    <pre><code>.\llama-server.exe -m "C:\models\model.gguf" --host 127.0.0.1 --port 8080</code></pre>
+    <p>Wait for the model to load. Keep the server running. Model speed, quality and memory requirements vary; not every model or server configuration is supported. This release does not configure authentication or other API origins.</p>
+    <h2>3. Check the connection</h2>
+    <p>Open <a href="http://127.0.0.1:8080/v1/models" target="_blank" rel="noopener noreferrer">http://127.0.0.1:8080/v1/models</a>. Expect JSON with a model ID in <code>data</code>. You can also open the toolbar popup and select Refresh status. Connected means model discovery succeeded, not that an inference request was tested.</p>
+    <h2>4. Open ChatGPT</h2>
+    <p>Open <a href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer">ChatGPT</a>, sign in if needed, and type a draft. Refresh an existing tab after installing or updating the extension. The Improve Prompt row appears near the composer.</p>
+    <h2>5. Improve and refine</h2>
+    <p>Click Improve Prompt to read and send your draft to your local server. Review the suggestion. Refine Further sends the original draft and only the latest successful rewrite for another pass; it keeps the previous preview if the request fails. Editing the draft or changing chats disables Apply and refinement for that preview. Click Improve Prompt to start again with the new draft.</p>
+    <h2>6. Apply or Copy</h2>
+    <p>Apply replaces the current draft if it still matches and the edit can be verified, then closes the preview. It never presses Send or submits the prompt to ChatGPT. Copy writes the suggestion to the system clipboard for you to paste manually. Copy original is available before applying; native undo may also recover the original. Cancel hides the panel and aborts the request, though the server may continue work until it notices disconnection.</p>
+    <h2>Privacy and control</h2>
+    <p>The extension sends prompt text only to <code>http://127.0.0.1:8080</code> after your Improve Prompt or Refine Further action. The popup sends no draft text. No developer-operated prompt service, analytics or advertising trackers are used. Settings are stored locally; prompts and suggestions are held temporarily in page/worker memory and are not written to extension storage.</p>
+    <p>You control the local server, including its logs, security and any forwarding. A proxy, tunnel or server plugin could transmit data elsewhere. ChatGPT can handle text in its editor according to its own policies, including before manual submission. Clipboard contents may be available to other applications or synced by your operating system. These systems are outside the extension's control.</p>
+    <p><a href="options.html">Open Settings</a></p>
+  </main>
+</body>
+</html>

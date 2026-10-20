@@ -2,6 +2,8 @@
 
 Improve your prompts with local AI.
 
+Version 0.2.0 adds a toolbar popup with model status, Settings and a packaged cross-platform Setup Guide. Opening the popup checks `/v1/models` only; it never captures a ChatGPT draft. Pin the extension in Chrome's toolbar to access it.
+
 Vanilla JavaScript Manifest V3 extension for `https://chatgpt.com/`. Improve a draft with a local llama.cpp model, review the suggestion, then Apply, Copy, Refine Further, or Cancel. Apply never submits a message.
 
 ## Start the server
@@ -100,7 +102,7 @@ node tests/live-smoke.cjs
 
 Verification performed on 2026-10-20:
 
-- All 57 tests passed: the existing 45 (with Retry UI expectations updated) plus 12 refinement regression tests. Coverage includes manifest/dependency checks, JS syntax, adapter request/errors, text serialization, focus/selection guards, request races, mutation bursts, composer recreation, shared settings, refinement payloads/limits/temperature and preview preservation.
+- All 67 tests passed: the existing 57 plus 10 publication regressions for popup states/senders, explicit-action-only draft capture, synthetic-click rejection and release packaging. Existing editor, API, refinement and lifecycle tests remain included.
 - The initial implementation's real adapter request passed against `google_gemma-4-E2B-it-Q4_K_M.gguf`. The hardening review does not rerun that optional live request.
 - **Not verified in Chrome:** unpacked loading, live ChatGPT layout, navigation, clipboard, native ProseMirror Apply/undo and ordinary composer behavior. No live browser tests were executed during this hardening review. DOM/Chrome doubles test control flow and serialization, not actual browser layout, undo or private ProseMirror state.
 
@@ -127,7 +129,7 @@ Refinement-specific checks (reload the extension and refresh ChatGPT first):
 7. Apply a successful refined result: verify insertion into the draft and automatic panel closure, with no automatic submission. If replacement cannot be verified, the panel must stay open with Copy available.
 
 1. Load unpacked; confirm no manifest/service-worker errors in `chrome://extensions`. Run options connection test.
-2. Check the button is visible, fits without overlapping Send, and is disabled for empty/whitespace-only drafts. Check light/dark mode and a narrow window.
+2. Check the button is visible and fits without overlapping Send. Empty/whitespace-only drafts are rejected on click without an API request; the extension deliberately does not read the draft to disable the button before a click. Check light/dark mode and a narrow window.
 3. Enter multiple paragraphs, blank lines, Shift+Enter line breaks, code, a Windows path and a URL. Improve and inspect **Original prompt** for preserved text.
 4. In the service-worker inspector's Network panel, confirm model discovery and a POST with `stream: false`, the discovered model, the full system instruction and the exact draft. Repeat and confirm no history accumulates.
 5. Confirm loading state prevents duplicate requests. Verify preview line breaks and that HTML-like output is shown literally.
@@ -181,3 +183,16 @@ Refinement-specific checks (reload the extension and refresh ChatGPT first):
 - Cancel aborts fetch and ignores late results; the server may continue inference until it notices disconnection.
 - The first valid discovered model is selected. Authenticated endpoints, alternate origins, streaming and multi-model selection are outside this MVP. A 20,000-character input may still exceed a particular model/server context limit; server errors are surfaced.
 - Recovery is in-memory plain text and is replaced by a new Improve Prompt request. Refine Further preserves the same original recovery copy. It is not a persistent backup. Failed clipboard access leaves selectable text for manual Ctrl+C.
+
+## Release preparation
+
+Build and validate the runtime-only package with Node.js (no npm packages):
+
+```powershell
+node scripts/build-release.cjs
+node scripts/build-release.cjs --check
+```
+
+Output: `release/local-prompt-enhancer-0.2.0.zip`. It includes 20 allowlisted runtime files, with `manifest.json` at the root. The validator checks archive integrity, current source bytes, icons and manifest/HTML/worker references. Tests, docs, source artwork, model files, secrets and existing archives are excluded.
+
+Read `RELEASE_CHECKLIST.md`, `PRIVACY_POLICY.md`, `docs/PERMISSIONS.md`, `docs/POLICY_REVIEW.md`, `store/LISTING.md` and `store/SCREENSHOTS.md` before publishing. Hosted URLs, publisher/contact details, real Chrome acceptance, the clipboard permission comparison, real screenshots and promotional graphics still require publisher work. No store upload or submission has been made.
