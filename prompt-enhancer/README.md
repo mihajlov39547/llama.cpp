@@ -28,7 +28,9 @@ The preview renders model output as text with line breaks, indentation and trail
 
 If the draft, editor instance, or chat changes after a request starts, Apply is disabled. Use Retry to improve the new draft, or Copy to merge the suggestion yourself.
 
-Expand **Original prompt (recovery copy)** to select or copy the captured original. It remains in page memory after Apply, until the next request or page unload. Native editing also allows Ctrl+Z. Copy the original before refreshing if you need durable recovery; prompts are not persisted to extension storage.
+After Apply successfully inserts and verifies the rewrite, the Improved Prompt panel closes automatically. If replacement fails, the panel stays open with the error and Copy fallback.
+
+Before applying, expand **Original prompt (recovery copy)** to select or copy the captured original. It remains in page memory after Apply, until the next request or page unload, but the panel is closed. Native editing also allows Ctrl+Z. Copy the original before applying or refreshing if you need durable recovery; prompts are not persisted to extension storage.
 
 Options are stored in `chrome.storage.local`:
 

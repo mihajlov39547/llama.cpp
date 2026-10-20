@@ -186,7 +186,7 @@
       await replaceEditorText(saved.editor, saved.text, rewrite,
         () => snapshot === saved && !saved.changed && location.href === saved.route && editor === saved.editor);
       saved.changed = true; // Prevent a second Apply; preserve original recovery.
-      message('Applied to the draft. Nothing was submitted. Original text remains available below.');
+      panel.hidden = true;
     } catch (error) {
       saved.changed = true;
       message(error.message, true);
