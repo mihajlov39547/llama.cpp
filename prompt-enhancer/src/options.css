@@ -1,0 +1,7 @@
+:root { color-scheme: light dark; font: 15px/1.5 system-ui, sans-serif; }
+main { max-width: 620px; margin: 40px auto; padding: 20px; }
+h1 { font-size: 24px; }
+label { display: block; margin: 14px 0; }
+input { display: block; width: 100%; padding: 8px; font: inherit; }
+button { padding: 8px 12px; margin: 8px 8px 0 0; cursor: pointer; }
+#status { white-space: pre-wrap; }

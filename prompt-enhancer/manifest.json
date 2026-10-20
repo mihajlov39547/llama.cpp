@@ -1,0 +1,28 @@
+
+{
+  "manifest_version": 3,
+  "name": "Local Llama Prompt Enhancer",
+  "version": "0.1.0",
+  "description": "Improve prompts using a local Llama model.",
+  "permissions": ["storage", "clipboardWrite"],
+  "host_permissions": [
+    "http://127.0.0.1:8080/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://chatgpt.com/*"],
+      "js": ["src/editor.js", "src/content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "options_page": "src/options.html",
+  "web_accessible_resources": [
+    {
+      "resources": ["src/styles.css"],
+      "matches": ["https://chatgpt.com/*"]
+    }
+  ]
+}
