@@ -4,11 +4,15 @@ Prepared locally; **not submitted to the Chrome Web Store**.
 
 ## Automated/package checks
 
-- [ ] Run `node --test tests/*.test.cjs`; record the exact passing count and zero failures.
-- [ ] Run `node scripts/build-release.cjs`, then `node scripts/build-release.cjs --check`.
-- [ ] Confirm ZIP: `release/local-prompt-enhancer-0.2.0.zip`, manifest at archive root, all runtime references resolve.
-- [ ] Confirm version 0.2.0, four PNG icon sizes, popup, setup, worker and ChatGPT content scripts.
-- [ ] Confirm allowlist excludes tests, documentation, source artwork/export tools, logs, secrets, models and prior archives.
+- [x] Run `node --test tests/*.test.cjs`: **67 passed, 0 failed** on 20 October 2026.
+- [x] Run `node scripts/build-release.cjs`, then `node scripts/build-release.cjs --check`.
+- [x] Confirm ZIP: `release/local-prompt-enhancer-0.2.0.zip`, manifest at archive root, all runtime references resolve. Independent .NET ZIP reader opened every entry.
+- [x] Confirm version 0.2.0, four PNG icon sizes, popup, setup, worker and ChatGPT content scripts.
+- [x] Confirm allowlist excludes tests, documentation, source artwork/export tools, logs, secrets, models and prior archives.
+
+Validated artifact: **20 entries, 31,361 bytes**. SHA-256:
+`de36206e8067c1367d28984025254bc2d7d04c4f8cd3874cd9ebbac491cbfd80`.
+Rerun these checks after any runtime change; the ZIP check also detects outdated packaged bytes.
 
 ## Real Chrome acceptance — not completed by automated DOM tests
 
