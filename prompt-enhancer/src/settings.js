@@ -34,8 +34,18 @@
       throw new ApiError('INPUT', `Prompt exceeds ${config.maxInputLength.toLocaleString()} characters.`);
     }
   }
+  const maxPreviousImprovementLength = limits.maxInputLength.max;
+  function validateRefinement(originalPrompt, previousImprovement, config) {
+    validatePrompt(originalPrompt, config);
+    if (typeof previousImprovement !== 'string' || !previousImprovement.trim()) {
+      throw new ApiError('INPUT', 'A previous improvement is required to refine further.');
+    }
+    if (previousImprovement.length > maxPreviousImprovementLength) {
+      throw new ApiError('INPUT', `Previous improvement exceeds ${maxPreviousImprovementLength.toLocaleString()} characters. Copy it or start a new improvement with a shorter draft.`);
+    }
+  }
   globalThis.PromptEnhancerSettings = {
-    defaults, limits, settings, validatePrompt, ApiError,
+    defaults, limits, settings, validatePrompt, validateRefinement, maxPreviousImprovementLength, ApiError,
     responseTimeoutMs: limits.timeoutMs.max + 5000
   };
 })();

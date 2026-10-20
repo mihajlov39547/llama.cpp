@@ -1,9 +1,16 @@
 (() => {
   'use strict';
-  const { defaults, settings, validatePrompt, ApiError } = globalThis.PromptEnhancerSettings;
-  async function run(prompt, rawSettings, { signal, fetchImpl = fetch, testOnly = false } = {}) {
+  const { defaults, settings, validatePrompt, validateRefinement, ApiError } = globalThis.PromptEnhancerSettings;
+  async function run(prompt, rawSettings, {
+    signal, fetchImpl = fetch, testOnly = false, mode = 'improve', previousImprovement
+  } = {}) {
     const config = settings(rawSettings);
-    if (!testOnly) validatePrompt(prompt, config);
+    if (!['improve', 'refine'].includes(mode)) throw new ApiError('INPUT', 'Unknown request mode.');
+    const refining = mode === 'refine';
+    if (!testOnly) {
+      if (refining) validateRefinement(prompt, previousImprovement, config);
+      else validatePrompt(prompt, config);
+    }
     const controller = new AbortController();
     let timedOut = false;
     const abort = () => controller.abort();
@@ -35,10 +42,12 @@
       if (!model) throw new ApiError('MODEL', 'No model is available. Start llama-server with a loaded GGUF model.');
       if (testOnly) return { model };
       const data = await json('/v1/chat/completions', {
-        model, stream: false, temperature: config.temperature, max_tokens: config.maxTokens,
+        model, stream: false,
+        temperature: refining ? Math.min(config.temperature + 0.1, 2.0) : config.temperature,
+        max_tokens: config.maxTokens,
         messages: [
-          { role: 'system', content: globalThis.PromptEnhancerInstruction },
-          { role: 'user', content: prompt }
+          { role: 'system', content: refining ? globalThis.PromptEnhancerRefinementInstruction : globalThis.PromptEnhancerInstruction },
+          { role: 'user', content: refining ? globalThis.buildPromptEnhancerRefinement(prompt, previousImprovement) : prompt }
         ]
       });
       const choice = data?.choices?.[0];

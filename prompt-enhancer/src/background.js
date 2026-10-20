@@ -19,7 +19,7 @@ function optionsSender(sender) {
     sender.url === chrome.runtime.getURL('src/options.html');
 }
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
-  if (!message || !['PE_IMPROVE', 'PE_CANCEL', 'PE_TEST'].includes(message.type)) return false;
+  if (!message || !['PE_IMPROVE', 'PE_REFINE', 'PE_CANCEL', 'PE_TEST'].includes(message.type)) return false;
   const isTest = message.type === 'PE_TEST';
   if (isTest ? !optionsSender(sender) : !chatSender(sender)) {
     respond({ ok: false, error: { code: 'SENDER', message: 'Untrusted request source.' } });
@@ -51,8 +51,11 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     try {
       const { settings } = await chrome.storage.local.get('settings');
       request.controller.signal.throwIfAborted();
-      const result = await API.run(message.prompt, settings, {
-        signal: request.controller.signal, testOnly: isTest
+      const refining = message.type === 'PE_REFINE';
+      const result = await API.run(refining ? message.originalPrompt : message.prompt, settings, {
+        signal: request.controller.signal, testOnly: isTest,
+        mode: refining ? 'refine' : 'improve',
+        previousImprovement: refining ? message.previousImprovement : undefined
       });
       request.controller.signal.throwIfAborted();
       respond({ ok: true, ...result });

@@ -34,14 +34,14 @@
   }
   const apply = button('Apply', actions, applyRewrite);
   const copy = button('Copy', actions, () => copyText(rewrite));
-  const retry = button('Retry', actions, start);
+  const refine = button('Refine Further', actions, () => start('refine'));
   const cancelButton = button('Cancel', actions, cancel);
   const recovery = element('details', '', panel);
   element('summary', 'Original prompt (recovery copy)', recovery);
   const original = element('textarea', '', recovery, { readonly: '', 'aria-label': 'Original prompt' });
   button('Copy original', recovery, () => copyText(original.value));
   const bar = element('div', '', shadow, { class: 'bar' });
-  const improve = button('✦ Improve Prompt', bar, start);
+  const improve = button('✦ Improve Prompt', bar, () => start('improve'));
   improve.dataset.promptEnhancerButton = '';
   let editor = null, route = location.href, snapshot = null, rewrite = '';
   let pending = null, applying = false, disposed = false, scheduled = false;
@@ -54,7 +54,7 @@
   function dirty() {
     if (snapshot && !applying) {
       snapshot.changed = true;
-      message('Your draft changed. Apply is disabled. Retry will improve the current draft.', true);
+      message('Your draft changed. Apply and Refine Further are disabled. Use Improve Prompt to start again with the current draft.', true);
     }
     update();
   }
@@ -70,7 +70,8 @@
     apply.disabled = !!pending || applying || !rewrite || !current();
     copy.disabled = !rewrite;
     cancelButton.disabled = applying;
-    retry.disabled = !!pending || applying || !editor || !readEditorText(editor).trim();
+    refine.disabled = !!pending || applying || !rewrite || !current();
+    refine.setAttribute('aria-busy', String(pending?.mode === 'refine'));
     recovery.hidden = !snapshot;
   }
   function stopRequest() {
@@ -101,7 +102,7 @@
       if (snapshot) {
         snapshot.changed = true;
         stopRequest();
-        message('The composer or chat changed. Copy the suggestion, or Retry with the current draft.', true);
+        message('The composer or chat changed. Copy the suggestion, or use Improve Prompt with the current draft.', true);
       }
       editor = found;
       route = location.href;
@@ -130,42 +131,51 @@
       queueMicrotask(reconcile);
     }
   }
-  async function start() {
+  async function start(mode = 'improve') {
     if (pending || applying) return;
     reconcile();
+    const refining = mode === 'refine';
+    if (refining && (!rewrite || !current())) return;
     panel.hidden = false;
     if (!editor) { message('ChatGPT editor could not be found.', true); return; }
-    const text = readEditorText(editor);
-    try { Settings.validatePrompt(text, Settings.defaults); }
+    const text = refining ? snapshot.text : readEditorText(editor);
+    const previousImprovement = refining ? rewrite : undefined;
+    function validate(config) {
+      if (refining) Settings.validateRefinement(text, previousImprovement, config);
+      else Settings.validatePrompt(text, config);
+    }
+    try { validate(Settings.defaults); }
     catch (error) { message(error.message, true); return; }
-    snapshot = { text, editor, route: location.href, changed: false };
-    original.value = text;
-    rewrite = '';
-    preview.textContent = '';
-    const request = { id: crypto.randomUUID(), timer: null };
+    if (!refining) {
+      snapshot = { text, editor, route: location.href, changed: false };
+      original.value = text;
+      rewrite = '';
+      preview.textContent = '';
+    }
+    const request = { id: crypto.randomUUID(), timer: null, mode };
     pending = request;
     request.timer = setTimeout(() => {
       if (pending !== request) return;
       stopRequest();
-      message('The background request stopped responding or timed out. Your draft is unchanged. Retry; if the extension was reloaded, refresh ChatGPT.', true);
+      message('The background request stopped responding or timed out. Your draft is unchanged. Try Refine Further again if a preview exists, or use Improve Prompt. If the extension was reloaded, refresh ChatGPT.', true);
       update();
     }, Settings.responseTimeoutMs);
-    message('Improving with your local model…');
+    message(refining ? 'Refining the previous improvement with your local model…' : 'Improving with your local model…');
     update();
     try {
       const { settings } = await chrome.storage.local.get('settings');
       if (pending !== request || disposed) return;
-      Settings.validatePrompt(text, Settings.settings(settings));
-      const result = await chrome.runtime.sendMessage({
-        type: 'PE_IMPROVE', requestId: request.id, prompt: text
-      });
+      validate(Settings.settings(settings));
+      const result = await chrome.runtime.sendMessage(refining ? {
+        type: 'PE_REFINE', requestId: request.id, originalPrompt: text, previousImprovement
+      } : { type: 'PE_IMPROVE', requestId: request.id, prompt: text });
       if (pending !== request || disposed) return;
       if (!result?.ok) throw new Error(result?.error?.message || 'The background worker returned no response. Retry.');
       if (typeof result.text !== 'string' || !result.text.trim()) throw new Error('No usable rewrite was returned.');
       rewrite = result.text;
       preview.textContent = rewrite;
       message(current() ? 'Review the rewrite before applying. Apply never sends the message.' :
-        'Your draft or composer changed. Copy the suggestion, or Retry with the current draft.', !current());
+        'Your draft or composer changed. Copy the suggestion, or use Improve Prompt with the current draft.', !current());
     } catch (error) {
       if (pending !== request || disposed) return;
       message(`${error.message} Your draft is unchanged.`, true);
@@ -227,7 +237,7 @@
     if (!event.persisted) cleanup();
     else if (pending) {
       stopRequest();
-      message('Request cancelled when leaving this page. Retry to improve the current draft.');
+      message('Request cancelled when leaving this page. Use Improve Prompt to start again, or Refine Further if the preview still matches this draft.');
       update();
     }
   }

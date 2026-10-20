@@ -234,18 +234,19 @@ test('options and worker dependencies exist and options bounds come from shared 
     assert.equal(field.max, limit.max / scale);
   }
 });
-test('worker channel rejection enables explicit Retry but never resends automatically', async () => {
+test('worker channel rejection enables Improve Prompt but never resends automatically', async () => {
   const f = setupContent();
   f.improve().emit('click');
   await tick();
   f.messages[0].response.reject(new Error('Message port closed'));
   await tick();
   assert.match(f.status(), /Message port closed/);
-  assert.equal(f.control('Retry').disabled, false);
+  assert.equal(f.improve().disabled, false);
+  assert.equal(f.control('Refine Further').disabled, true);
   assert.equal(f.messages.length, 1);
   assert.equal(f.timers.size, 0);
 });
-test('watchdog cancels hung worker, enables Retry and ignores its eventual response', async () => {
+test('watchdog cancels hung worker, enables Improve Prompt and ignores its eventual response', async () => {
   const f = setupContent();
   f.improve().emit('click');
   await tick();
@@ -253,9 +254,9 @@ test('watchdog cancels hung worker, enables Retry and ignores its eventual respo
   const watchdog = [...f.timers.values()].find(timer => timer.delay === f.ctx.PromptEnhancerSettings.responseTimeoutMs);
   watchdog.fn();
   assert.match(f.status(), /stopped responding/);
-  assert.equal(f.control('Retry').disabled, false);
+  assert.equal(f.improve().disabled, false);
   assert.equal(f.messages.filter(message => message.type === 'PE_IMPROVE').length, 1);
-  f.control('Retry').emit('click');
+  f.improve().emit('click');
   await tick();
   const newer = f.messages.filter(message => message.type === 'PE_IMPROVE')[1];
   newer.response.resolve({ ok: true, text: 'Retry result' });
