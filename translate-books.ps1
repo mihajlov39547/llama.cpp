@@ -8,6 +8,8 @@ Interactive by default. -Book selects exactly one filename non-interactively.
 -MaxSegments pauses after N unfinished segments (0 = unlimited).
 -Resume resumes the newest experiment for that book; -NewRun explicitly starts
 a separate experiment. Neither option overwrites a completed destination.
+-ExperimentDirectory selects an exact run. -RepairOnly performs offline
+transliteration repair; -RepairAndResume explicitly repairs then continues.
 Checkpoints/attempts are authoritative; CSV/JSONL/reports are derived snapshots.
 Run artifacts: BenchmarkDirectory\<book>.sr-latn.<UTC>-<GUID>\...
 UTF-8 (strict, BOM optional) and BOM-marked UTF-16 are accepted. Output is UTF-8
@@ -47,6 +49,9 @@ param(
     [string] $Book,
     [switch] $Resume,
     [switch] $NewRun,
+    [string] $ExperimentDirectory,
+    [switch] $RepairOnly,
+    [switch] $RepairAndResume,
     [ValidateRange(0, 2147483647)][int] $MaxSegments = 0,
     [switch] $FunctionsOnly
 )
@@ -141,6 +146,43 @@ function Get-TBPrompt([string] $SourceText) {
     # Replace is literal, not a regex/replacement-language expansion.
     return $script:TBPromptTemplate.Replace('{SOURCE_TEXT}', $SourceText)
 }
+function Convert-TBSerbianLatin([string] $Text) {
+    # Code points keep this script safe to load as ANSI in Windows PowerShell 5.1.
+    $codes = @(0x430,0x431,0x432,0x433,0x434,0x452,0x435,0x436,0x437,0x438,
+        0x458,0x43A,0x43B,0x459,0x43C,0x43D,0x45A,0x43E,0x43F,0x440,
+        0x441,0x442,0x45B,0x443,0x444,0x445,0x446,0x447,0x45F,0x448)
+    $latin = @('a','b','v','g','d',([string][char]0x111),'e',([string][char]0x17E),'z','i',
+        'j','k','l','lj','m','n','nj','o','p','r','s','t',([string][char]0x107),
+        'u','f','h','c',([string][char]0x10D),('d'+[char]0x17E),([string][char]0x161))
+    $map=@{}
+    for ($i=0; $i -lt $codes.Count; $i++) { $map[$codes[$i]]=$latin[$i] }
+    $builder=[Text.StringBuilder]::new()
+    foreach ($token in [regex]::Matches($Text, '\p{L}[\p{L}\p{M}]*|[^\p{L}]+')) {
+        $word=$token.Value
+        # Uppercase words use LJ/NJ/DZ (with caron); title case uses Lj/Nj/Dz.
+        # A standalone uppercase digraph also uses full capitals.
+        $allCaps=($word -cmatch '\p{Lu}' -and $word -cnotmatch '\p{Ll}')
+        foreach ($letter in $word.ToCharArray()) {
+            $lower=[int][char]::ToLowerInvariant($letter)
+            if (-not $map.ContainsKey($lower)) { [void]$builder.Append($letter); continue }
+            $replacement=[string]$map[$lower]
+            if ([char]::IsUpper($letter)) {
+                if ($allCaps) { $replacement=$replacement.ToUpperInvariant() }
+                else { $replacement=$replacement.Substring(0,1).ToUpperInvariant()+$replacement.Substring(1) }
+            }
+            [void]$builder.Append($replacement)
+        }
+    }
+    return $builder.ToString()
+}
+function Get-TBOriginalScript([string] $Text) {
+    $cy=$Text -match '[\u0400-\u052F\u2DE0-\u2DFF\uA640-\uA69F]'
+    $la=$Text -match '[A-Za-z\u00C0-\u024F\u1E00-\u1EFF]'
+    if ($cy -and $la) { return 'Mixed' }
+    if ($cy) { return 'Cyrillic' }
+    if ($la) { return 'Latin' }
+    return 'OtherOrNone'
+}
 function Invoke-TBJson([string] $Uri, $Body = $null, [int] $Timeout = 15) {
     if ($null -eq $Body) { return Invoke-RestMethod -Uri $Uri -Method Get -TimeoutSec $Timeout -MaximumRedirection 0 }
     $bytes = $script:TBEncoding.GetBytes((Get-TBJson $Body))
@@ -185,6 +227,14 @@ function Test-TBTranslation([string] $SourceText, $Response, [string] $ExpectedM
     $text = ''
     if ($raw -isnot [string] -or [string]::IsNullOrWhiteSpace($raw)) { $issues.Add('Empty or non-string translation') }
     else { $text = $raw.TrimEnd([char[]]"`r`n") }
+    $originalScript=Get-TBOriginalScript $text
+    $transliterationMs=0.0; $wasTransliterated=$false
+    if ($originalScript -in @('Cyrillic','Mixed')) {
+        $postClock=[Diagnostics.Stopwatch]::StartNew()
+        $converted=Convert-TBSerbianLatin $text
+        $postClock.Stop(); $transliterationMs=$postClock.Elapsed.TotalMilliseconds
+        $wasTransliterated=$converted -cne $text; $text=$converted
+    }
     $cyrillic = [regex]::IsMatch($text, '[\u0400-\u052F\u2DE0-\u2DFF\uA640-\uA69F]')
     if ($cyrillic) { $issues.Add('Cyrillic script violation') }
     $otherScript = [regex]::IsMatch(($text -replace '[A-Za-z\u00C0-\u024F\u1E00-\u1EFF]', ''), '\p{L}')
@@ -203,6 +253,9 @@ function Test-TBTranslation([string] $SourceText, $Response, [string] $ExpectedM
         Valid = ($issues.Count -eq 0); Text = $text; RawText = $raw; FinishReason = $finish
         ScriptResult = $(if ($cyrillic) { 'cyrillic_violation' } elseif ($otherScript) { 'non_latin_violation' } elseif (-not $text) { 'not_checked' } else { 'latin_pass' })
         Truncated = $truncated; Error = ($issues -join '; ')
+        OriginalScript=$originalScript; WasTransliterated=$wasTransliterated
+        TransliterationTimeMs=$transliterationMs
+        AcceptedWithoutModification=($issues.Count -eq 0 -and $text -ceq $raw)
     }
 }
 function Get-TBRate($Count, $Milliseconds) {
@@ -214,6 +267,8 @@ function New-TBAttempt($Line, [int] $Number, [string] $ExperimentId) {
         ExperimentId = $ExperimentId; SegmentId = $Line.SegmentId; SourceLineNumber = $Line.LineNumber
         AttemptNumber = $Number; RetryCount = ($Number - 1); StartedUtc = [DateTime]::UtcNow.ToString('o')
         SourceText = $Line.Text; TranslatedText = ''; RawTranslatedText = $null
+        OriginalScript=$null; WasTransliterated=$false; TransliterationTimeMs=0.0
+        AcceptedWithoutModification=$false; PostprocessingVersion='serbian-latin-v1'
         SourceCharacterCount = $Line.Text.Length; TargetCharacterCount = $null
         SourceWordCount = (Get-TBWords $Line.Text); TargetWordCount = $null
         PromptTokenCount = $null; GeneratedTokenCount = $null
@@ -228,6 +283,119 @@ function New-TBAttempt($Line, [int] $Number, [string] $ExperimentId) {
 }
 function Get-TBSegmentPath([string] $RunDirectory, [int] $Id) {
     return Join-Path (Join-Path $RunDirectory 'segments') ('{0:D8}.json' -f $Id)
+}
+function Get-TBRepairPath($RunDirectory, $Id) {
+    return Join-Path (Join-Path $RunDirectory 'repairs') ('{0:D8}.json' -f [int]$Id)
+}
+function Get-TBRepairValidation($Record, $Attempt, $Model) {
+    if ($Attempt.TranslationStatus -cne 'invalid' -or
+        $Attempt.ErrorMessage -cne 'Cyrillic script violation' -or
+        $Attempt.ScriptValidationResult -cne 'cyrillic_violation' -or
+        $Attempt.Truncated -ne $false -or $Attempt.FinishReason -cne 'stop' -or
+        $Attempt.RawTranslatedText -isnot [string] -or
+        [string]::IsNullOrWhiteSpace($Attempt.RawTranslatedText) -or
+        $Attempt.SegmentId -ne $Record.SegmentId -or
+        $Attempt.SourceLineNumber -ne $Record.SourceLineNumber -or
+        $Attempt.SourceText -cne $Record.SourceText) { return $null }
+    $response=[pscustomobject]@{ model=$Model; choices=@([pscustomobject]@{
+        finish_reason=$Attempt.FinishReason; message=[pscustomobject]@{content=$Attempt.RawTranslatedText}
+    }) }
+    $validation=Test-TBTranslation $Record.SourceText $response $Model
+    if ($validation.Valid -and $validation.WasTransliterated) { return $validation }
+    return $null
+}
+function Read-TBRepairOverlay($Record, $RunDirectory, $Model) {
+    $path=Get-TBRepairPath $RunDirectory $Record.SegmentId
+    if (-not (Test-Path -LiteralPath $path)) { return }
+    $audit=Read-TBJson $path
+    $segmentPath=Get-TBSegmentPath $RunDirectory $Record.SegmentId
+    if ($audit.OriginalSegmentSha256 -cne (Get-TBFileHash $segmentPath) -or
+        $audit.ExperimentId -cne $Record.ExperimentId -or $audit.SegmentId -ne $Record.SegmentId -or
+        $audit.SourceLineNumber -ne $Record.SourceLineNumber -or $audit.SourceText -cne $Record.SourceText) {
+        throw "Repair audit/source mismatch: $path"
+    }
+    $attempts=@($Record.Attempts | Where-Object { $_.AttemptNumber -eq $audit.OriginalAttempt.AttemptNumber })
+    if ($attempts.Count -ne 1 -or (Get-TBJson $attempts[0]) -cne (Get-TBJson $audit.OriginalAttempt)) {
+        throw "Repair original attempt mismatch: $path"
+    }
+    $valid=Get-TBRepairValidation $Record $attempts[0] $Model
+    if (-not $valid -or $valid.Text -cne $audit.TranslatedText) { throw "Invalid repaired translation: $path" }
+    $Record | Add-Member NoteProperty Repair $audit -Force
+    $Record.Status='completed'; $Record.Translation=$audit.TranslatedText
+}
+function Repair-TBExperiment([string] $Directory) {
+    $cps=@(Get-ChildItem -LiteralPath $Directory -Filter '*.checkpoint.json' -File)
+    if ($cps.Count -ne 1) { throw 'Repair requires exactly one checkpoint in the specified experiment directory.' }
+    $lock=[IO.FileStream]::new((Join-Path $Directory 'run.lock'),[IO.FileMode]::OpenOrCreate,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
+    try {
+        $state=Read-TBJson $cps[0].FullName
+        $source=Read-TBSource $state.Metadata.InputPath
+        if ($state.SchemaVersion -ne 1 -or $source.Hash -cne $state.Metadata.SourceSha256 -or
+            $state.Metadata.PromptSha256 -cne (Get-TBHash $script:TBEncoding.GetBytes($script:TBPromptTemplate))) {
+            throw 'Repair refused: source or fixed prompt changed, or checkpoint schema unsupported.'
+        }
+        $records=@{}
+        # Validate the entire source alignment before writing anything.
+        foreach ($line in $source.Lines) {
+            if ($null -eq $line.SegmentId) { continue }
+            $path=Get-TBSegmentPath $Directory $line.SegmentId
+            if (-not (Test-Path -LiteralPath $path)) { continue }
+            $r=Read-TBJson $path
+            if ($r.SourceText -cne $line.Text -or $r.SegmentId -ne $line.SegmentId -or
+                $r.SourceLineNumber -ne $line.LineNumber -or $r.ExperimentId -cne $state.Metadata.ExperimentId) {
+                throw "Repair source alignment mismatch: $path"
+            }
+            Read-TBRepairOverlay $r $Directory $state.Metadata.Model.ModelId
+            if ($r.Status -eq 'completed' -and -not (Get-TBValue $r 'Repair')) {
+                $accepted=@($r.Attempts | Where-Object TranslationStatus -eq 'success')
+                if ($accepted.Count -ne 1 -or $r.Translation -cne $accepted[0].TranslatedText) {
+                    throw "Invalid completed segment: $path"
+                }
+            }
+            $records[[int]$line.SegmentId]=$r
+        }
+        [void][IO.Directory]::CreateDirectory((Join-Path $Directory 'repairs'))
+        # Immutable pre-repair snapshot retains original aggregate statistics.
+        $snapshot=Join-Path $Directory 'repairs\before-repair'
+        if (-not (Test-Path -LiteralPath $snapshot)) {
+            $stage=$snapshot+'.'+[guid]::NewGuid().ToString('N')
+            [void][IO.Directory]::CreateDirectory($stage)
+            foreach ($file in Get-ChildItem -LiteralPath $Directory -File) {
+                if ($file.Extension -in @('.json','.csv','.txt','.jsonl')) { [IO.File]::Copy($file.FullName,(Join-Path $stage $file.Name)) }
+            }
+            [IO.Directory]::Move($stage,$snapshot)
+        }
+        $repaired=0
+        foreach ($r in @($records.Values | Sort-Object SegmentId)) {
+            if ($r.Status -ne 'failed') { continue }
+            foreach ($a in @($r.Attempts | Sort-Object AttemptNumber)) {
+                $v=Get-TBRepairValidation $r $a $state.Metadata.Model.ModelId
+                if (-not $v) { continue }
+                $audit=[pscustomobject][ordered]@{
+                    ExperimentId=$r.ExperimentId; SegmentId=$r.SegmentId; SourceLineNumber=$r.SourceLineNumber
+                    SourceText=$r.SourceText; CreatedUtc=[DateTime]::UtcNow.ToString('o')
+                    Action='serbian-latin-v1'; OriginalStatus=$r.Status
+                    OriginalSegmentSha256=(Get-TBFileHash (Get-TBSegmentPath $Directory $r.SegmentId))
+                    OriginalAttempt=$a; RawTranslatedText=$a.RawTranslatedText; TranslatedText=$v.Text
+                    OriginalScript=$v.OriginalScript; WasTransliterated=$true
+                    TransliterationTimeMs=$v.TransliterationTimeMs; AcceptedWithoutModification=$false
+                    HttpRequest=$false
+                }
+                Write-TBAtomic (Get-TBRepairPath $Directory $r.SegmentId) (Get-TBJson $audit)
+                Read-TBRepairOverlay $r $Directory $state.Metadata.Model.ModelId
+                $repaired++; break
+            }
+        }
+        $state.ConfirmedSegments=@($records.Values | Where-Object Status -eq 'completed').Count
+        $state.Status='paused'
+        if (@($records.Values | Where-Object Status -eq 'failed').Count) { $state.Status='failed' }
+        if ($state.ConfirmedSegments -eq $source.SegmentCount) { Complete-TBOutput $state $source $records }
+        $state.UpdatedUtc=[DateTime]::UtcNow.ToString('o')
+        Write-TBAtomic $cps[0].FullName (Get-TBJson $state)
+        $stem=[IO.Path]::GetFileNameWithoutExtension($state.Metadata.InputPath)+'.sr-latn'
+        Write-TBReports $state $source $records $Directory $stem
+        Write-Host "Repair: $repaired newly accepted segments; $($state.ConfirmedSegments) confirmed. No HTTP requests."
+    } finally { $lock.Dispose() }
 }
 function Save-TBCheckpoint($State, [string] $Path, $Clock, [double] $BaseWallMs) {
     $State.ActiveWallMs = $BaseWallMs + $Clock.Elapsed.TotalMilliseconds
@@ -269,6 +437,8 @@ function Write-TBReports($State, $Source, $Records, [string] $RunDirectory, [str
     $throughputWords = Get-TBSum $throughput 'SourceWordCount'
     $http = @($attempts | Where-Object { $_.HttpRequest })
     $failedRecords = @($Records.Values | Where-Object { $_.Status -eq 'failed' })
+    $repairs=@($Records.Values | Where-Object { $null -ne (Get-TBValue $_ 'Repair') } | ForEach-Object { $_.Repair })
+    $completed=@($Records.Values | Where-Object Status -eq 'completed')
     $retriedRecords = @($Records.Values | Where-Object { @($_.Attempts).Count -gt 1 })
     $wordLengths = @($Source.Lines | Where-Object { $null -ne $_.SegmentId } | ForEach-Object { Get-TBWords $_.Text })
     $charLengths = @($Source.Lines | Where-Object { $null -ne $_.SegmentId } | ForEach-Object { $_.Text.Length })
@@ -284,9 +454,18 @@ function Write-TBReports($State, $Source, $Records, [string] $RunDirectory, [str
     if ($inferencePairs.Count) { $inferenceMs = (Get-TBSum $inferencePairs 'PromptProcessingMs') + (Get-TBSum $inferencePairs 'TokenGenerationMs') }
     $summary = [ordered]@{
         ExperimentId=$State.Metadata.ExperimentId; Status=$State.Status; Metadata=$State.Metadata
+        PostprocessingVersion='serbian-latin-v1'
         UpdatedUtc=$State.UpdatedUtc; TotalSourceSegments=$Source.SegmentCount
-        SuccessfulSegments=$success.Count; FailedSegments=$failedRecords.Count
-        PendingSegments=($Source.SegmentCount-$success.Count-$failedRecords.Count)
+        SuccessfulSegments=$success.Count; FailedSegments=($failedRecords.Count+$repairs.Count)
+        RepairedSegments=$repairs.Count; EffectiveCompletedSegments=$completed.Count
+        RemainingFailedSegments=$failedRecords.Count
+        PendingSegments=($Source.SegmentCount-$completed.Count-$failedRecords.Count)
+        CyrillicGenerationCount=@($attempts | Where-Object { (Get-TBOriginalScript $_.RawTranslatedText) -in @('Cyrillic','Mixed') }).Count
+        TransliteratedSegments=(@($completed | Where-Object {
+            (Get-TBValue $_ 'Repair') -or @($_.Attempts | Where-Object { $_.TranslationStatus -eq 'success' -and $_.WasTransliterated }).Count
+        }).Count)
+        TransliterationTimeMs=((Get-TBSum $attempts 'TransliterationTimeMs')+(Get-TBSum $repairs 'TransliterationTimeMs'))
+        EffectiveTranslatedWords=(@($completed | ForEach-Object { Get-TBWords $_.Translation } | Measure-Object -Sum).Sum)
         TotalSourceWords=$sourceWords; SuccessfulSourceWords=$acceptedWords; TotalTranslatedWords=$targetWords
         TotalSourceCharacters=$sourceChars; SuccessfulTargetCharacters=$targetChars
         SegmentLengthWords=(Get-TBStats $wordLengths); SegmentLengthCharacters=(Get-TBStats $charLengths)
@@ -312,12 +491,13 @@ function Write-TBReports($State, $Source, $Records, [string] $RunDirectory, [str
         RetryHttpOverheadMs=(Get-TBSum @($http | Where-Object { $_.RetryCount -gt 0 }) 'EndToEndLatencyMs')
         UnsuccessfulHttpOverheadMs=(Get-TBSum @($http | Where-Object { $_.TranslationStatus -ne 'success' }) 'EndToEndLatencyMs')
         RetryRatePerAttemptedSegment=$(if ($Records.Count) { $retriedRecords.Count/[double]$Records.Count } else { $null })
-        FailureRatePerAttemptedSegment=$(if ($Records.Count) { $failedRecords.Count/[double]$Records.Count } else { $null })
+        FailureRatePerAttemptedSegment=$(if ($Records.Count) { ($failedRecords.Count+$repairs.Count)/[double]$Records.Count } else { $null })
         CyrillicViolations=@($attempts | Where-Object { $_.ScriptValidationResult -eq 'cyrillic_violation' }).Count
         TruncatedResponses=@($attempts | Where-Object { $_.Truncated }).Count
         InterruptedAttempts=@($attempts | Where-Object { $_.TranslationStatus -eq 'interrupted' }).Count
         PercentileMethod='nearest-rank P90/P95/P99; median averages middle pair for even samples'
         Notes=@('Segments are non-empty source lines, not linguistically detected sentences.',
+            'Repair overlays do not change historical SuccessfulSegments/FailedSegments or inference metrics. EffectiveCompletedSegments includes repaired lines; repairs are separate non-HTTP audit records.',
             'Successful throughput uses only successful first attempts: RetryCount=0. All retry attempts are excluded; accepted word totals and successful latency include eventual successes.',
             'Aggregate token rates pair only records with server timing token counts and measured positive times.',
             'Missing telemetry is null. Active wall time includes translation, checkpoint and periodic report work; excludes setup and final report export. Crash gaps are not estimated.',
@@ -326,8 +506,15 @@ function Write-TBReports($State, $Source, $Records, [string] $RunDirectory, [str
     }
     Write-TBAtomic (Join-Path $RunDirectory "$Stem.summary.json") (Get-TBJson $summary)
     $csv = ''
-    if ($attempts.Count) { $csv = (@($attempts | ConvertTo-Csv -NoTypeInformation) -join "`r`n") + "`r`n" }
+    if ($attempts.Count) {
+        # Project legacy rows without mutating stored attempts; expose new columns
+        # even when the first row predates postprocessing.
+        $columns=@($attempts[0].PSObject.Properties.Name)+@('OriginalScript','WasTransliterated','TransliterationTimeMs','AcceptedWithoutModification','PostprocessingVersion')
+        $columns=@($columns | Select-Object -Unique)
+        $csv = (@($attempts | Select-Object -Property $columns | ConvertTo-Csv -NoTypeInformation) -join "`r`n") + "`r`n"
+    }
     Write-TBAtomic (Join-Path $RunDirectory "$Stem.segments.csv") $csv
+    Write-TBAtomic (Join-Path $RunDirectory "$Stem.repairs.json") (Get-TBJson @($repairs))
     $aligned = [Text.StringBuilder]::new()
     foreach ($line in $Source.Lines) {
         $status = 'blank'; $target = $line.Text
@@ -349,7 +536,8 @@ function Write-TBReports($State, $Source, $Records, [string] $RunDirectory, [str
         "Status: $($State.Status) | Direction: en -> sr-Latn",
         "Source: $($State.Metadata.InputPath)",
         "Model: $($State.Metadata.Model.ModelId)",
-        "Source lines/segments: $($Source.SegmentCount); completed: $($success.Count); failed: $($failedRecords.Count)",
+        "Source lines/segments: $($Source.SegmentCount); effectively completed: $($completed.Count); remaining failed: $($failedRecords.Count)",
+        "Historical inference successes: $($success.Count); repaired segments: $($repairs.Count)",
         'All lengths below describe source lines, not necessarily sentences.',
         'Detailed measurements (null means unavailable):',
         (ConvertTo-Json -InputObject $summary -Depth 40)
@@ -397,6 +585,8 @@ function Start-TBMain {
     $BenchmarkDirectory = [IO.Path]::GetFullPath($BenchmarkDirectory)
     $checkpoints = @()
     foreach ($file in @(Get-ChildItem -LiteralPath $BenchmarkDirectory -Filter '*.checkpoint.json' -File -Recurse)) {
+        if ($file.DirectoryName -match '[\\/]repairs([\\/]|$)') { continue }
+        if ($ExperimentDirectory -and $file.DirectoryName -ne [IO.Path]::GetFullPath($ExperimentDirectory).TrimEnd('\','/')) { continue }
         try { $cp = Read-TBJson $file.FullName; $checkpoints += [pscustomobject]@{ Path=$file.FullName; State=$cp } }
         catch { throw "Unreadable checkpoint (resolve or move it before continuing): $($file.FullName)" }
     }
@@ -500,6 +690,7 @@ function Start-TBMain {
     # Exclusive run lock prevents simultaneous resume/duplicate writes. OS releases it on crash.
     $lock = [IO.FileStream]::new((Join-Path $runDirectory 'run.lock'),[IO.FileMode]::OpenOrCreate,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
     $records = @{}; $baseWallMs=[double]$state.ActiveWallMs; $clock=[Diagnostics.Stopwatch]::StartNew()
+    $recordsLoaded=$false
     try {
         foreach ($line in $source.Lines) {
             if ($null -eq $line.SegmentId) { continue }
@@ -509,19 +700,24 @@ function Start-TBMain {
             if ($record.SegmentId -ne $line.SegmentId -or $record.SourceLineNumber -ne $line.LineNumber -or
                 $record.SourceText -cne $line.Text -or $record.ExperimentId -cne $state.Metadata.ExperimentId) { throw "Checkpoint alignment mismatch: $segmentPath" }
             $record.Attempts=@($record.Attempts)
+            $recordChanged=$false
+            Read-TBRepairOverlay $record $runDirectory $server.ModelId
             foreach ($attempt in $record.Attempts) {
                 if ($attempt.TranslationStatus -eq 'in_flight') {
                     $attempt.TranslationStatus='interrupted'; $attempt.ErrorMessage='No confirmed response before interruption; HTTP duration and server outcome unknown.'
                     $record.Status='pending'
+                    $recordChanged=$true
                 }
             }
             if ($record.Status -eq 'completed') {
                 $accepted=@($record.Attempts | Where-Object { $_.TranslationStatus -eq 'success' })
-                if ($accepted.Count -ne 1 -or $record.Translation -cne $accepted[0].TranslatedText) { throw "Invalid completed segment: $segmentPath" }
+                if (-not (Get-TBValue $record 'Repair') -and
+                    ($accepted.Count -ne 1 -or $record.Translation -cne $accepted[0].TranslatedText)) { throw "Invalid completed segment: $segmentPath" }
             } elseif ($record.Attempts.Count -ge 3) { $record.Status='failed' }
             $records[[int]$line.SegmentId]=$record
-            Write-TBAtomic $segmentPath (Get-TBJson $record)
+            if ($recordChanged -and -not (Get-TBValue $record 'Repair')) { Write-TBAtomic $segmentPath (Get-TBJson $record) }
         }
+        $recordsLoaded=$true
         $state.Status='running'
         $state.ConfirmedSegments=@($records.Values | Where-Object { $_.Status -eq 'completed' }).Count
         Save-TBCheckpoint $state $checkpointPath $clock $baseWallMs
@@ -569,6 +765,10 @@ function Start-TBMain {
                     $httpClock.Stop(); $attempt.EndToEndLatencyMs=$httpClock.Elapsed.TotalMilliseconds
                     $validation=Test-TBTranslation $line.Text $response $server.ModelId
                     $attempt.TranslatedText=$validation.Text; $attempt.RawTranslatedText=$validation.RawText
+                    $attempt.OriginalScript=$validation.OriginalScript
+                    $attempt.WasTransliterated=$validation.WasTransliterated
+                    $attempt.TransliterationTimeMs=$validation.TransliterationTimeMs
+                    $attempt.AcceptedWithoutModification=$validation.AcceptedWithoutModification
                     $attempt.FinishReason=$validation.FinishReason; $attempt.ScriptValidationResult=$validation.ScriptResult
                     $attempt.Truncated=$validation.Truncated; $attempt.ErrorMessage=$validation.Error
                     $attempt.TargetCharacterCount=$validation.Text.Length; $attempt.TargetWordCount=Get-TBWords $validation.Text
@@ -616,15 +816,43 @@ function Start-TBMain {
         # Atomic segment files already preserve confirmed work if Ctrl+C prevents
         # PowerShell from executing these best-effort derived exports.
         try {
-            if ($state.Status -eq 'running') { $state.Status='paused' }
             $clock.Stop()
-            Save-TBCheckpoint $state $checkpointPath $clock $baseWallMs
-            Write-TBReports $state $source $records $runDirectory $stem
+            if ($recordsLoaded) {
+                if ($state.Status -eq 'running') { $state.Status='paused' }
+                Save-TBCheckpoint $state $checkpointPath $clock $baseWallMs
+                Write-TBReports $state $source $records $runDirectory $stem
+            }
         } finally { $clock.Stop(); $lock.Dispose() }
     }
     Write-Host "Run status: $($state.Status) | confirmed: $($state.ConfirmedSegments)/$($source.SegmentCount)" -ForegroundColor Cyan
     Write-Host "Benchmarks: $runDirectory"
     if ($state.Status -eq 'completed') { Write-Host "UTF-8 output: $($state.Metadata.OutputPath)" -ForegroundColor Green }
-    else { Write-Host 'No final book was published. Resume preserves successes; exhausted failures require review and an explicit new experiment.' }
+    else { Write-Host 'No final book was published. Resume preserves successes; use explicit repair for legacy Cyrillic-only failures. Other exhausted failures require review.' }
 }
-if (-not $FunctionsOnly) { Start-TBMain }
+if (-not $FunctionsOnly) {
+    if ($RepairOnly -and $RepairAndResume) { throw 'Choose -RepairOnly or -RepairAndResume.' }
+    if (($RepairOnly -or $RepairAndResume) -and -not $ExperimentDirectory) { throw 'Repair requires -ExperimentDirectory (an exact run directory).' }
+    if ($ExperimentDirectory) {
+        if ($NewRun) { throw '-ExperimentDirectory cannot be combined with -NewRun.' }
+        $ExperimentDirectory=[IO.Path]::GetFullPath($ExperimentDirectory).TrimEnd('\','/')
+        $selectedCp=@(Get-ChildItem -LiteralPath $ExperimentDirectory -Filter '*.checkpoint.json' -File)
+        if ($selectedCp.Count -ne 1) { throw 'Expected exactly one checkpoint in -ExperimentDirectory.' }
+        $saved=Read-TBJson $selectedCp[0].FullName
+        $SourceDirectory=Split-Path -Parent $saved.Metadata.InputPath
+        $DestinationDirectory=Split-Path -Parent $saved.Metadata.OutputPath
+        $BenchmarkDirectory=Split-Path -Parent $ExperimentDirectory
+        $Book=[IO.Path]::GetFileName($saved.Metadata.InputPath); $Resume=$true
+        # Reuse saved values unless explicitly overridden; normal resume still
+        # checks the full fingerprint against the live server before inference.
+        foreach ($setting in @('MaxTokens','TimeoutSeconds','ContextSize')) {
+            if (-not $PSBoundParameters.ContainsKey($setting)) { Set-Variable -Name $setting -Value $saved.Metadata.Configuration.$setting }
+        }
+        if (-not $PSBoundParameters.ContainsKey('ModelId')) { $ModelId=$saved.Metadata.Model.ModelId }
+    }
+    if ($RepairOnly -or $RepairAndResume) {
+        Repair-TBExperiment $ExperimentDirectory
+        $afterRepair=Read-TBJson $selectedCp[0].FullName
+        if ($RepairOnly -or $afterRepair.Status -eq 'completed') { return }
+    }
+    Start-TBMain
+}

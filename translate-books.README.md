@@ -43,8 +43,8 @@ Segment records are atomically saved before dispatch and after each response.
 Resume skips confirmed successes, recognizes unconfirmed requests as interrupted,
 and counts them against the maximum of three attempts per segment. A failed
 segment is never silently copied into the translation as English. Exhausted
-failures require review and an explicit new experiment; ordinary resume does
-not reset the retry budget. The final output is assembled only after every
+failures require review; legacy Cyrillic-only failures can be repaired explicitly
+as described below. Ordinary resume does not reset the retry budget. The final output is assembled only after every
 segment succeeds. Keep the whole experiment directory for resume.
 
 Resume refuses changes to source bytes, prompt, relevant request settings,
@@ -72,8 +72,78 @@ them. Interior newlines in a model response are rejected to retain physical line
 alignment. Trailing CR/LF is removed, with the raw response retained for auditing.
 
 Latin-script and leakage checks are heuristics, not an evaluation of Serbian
-fluency or literary quality. The fixed prompt can still produce Cyrillic; those
-responses are rejected. BLEU, chrF, TER and COMET are not calculated.
+fluency or literary quality. Valid Serbian Cyrillic responses are now
+transliterated locally into Latin, including mixed-script responses. Latin
+characters and punctuation are preserved. Digraphs use `Lj`, `Nj`, and `Dž`
+in title-case words and `LJ`, `NJ`, and `DŽ` in all-capital words. A standalone
+uppercase digraph is treated as all-capital; casing ambiguity cannot always be
+resolved from a single letter. Unsupported Cyrillic letters remain invalid.
+BLEU, chrF, TER and COMET are not calculated.
+
+## Transliteration and safe repair
+
+The fixed prompt and inference settings are unchanged. New requests accept
+otherwise valid Cyrillic output after transliteration, without another model
+request. Empty, truncated, errored, multiline, or otherwise invalid results
+still fail validation.
+
+Each new attempt records `OriginalScript` (`Latin`, `Cyrillic`, `Mixed`, or
+`OtherOrNone`), `WasTransliterated`, `TransliterationTimeMs`,
+`AcceptedWithoutModification`, and `PostprocessingVersion`. `RawTranslatedText`
+is the exact model content; `TranslatedText` is the postprocessed Latin result.
+`AcceptedWithoutModification` is true only if an accepted result exactly equals
+the raw content, including whitespace. HTTP and model generation times exclude
+transliteration; postprocessing time is measured separately.
+
+Summary `CyrillicGenerationCount` counts all Cyrillic/mixed generation attempts,
+including historical failures and retries. `TransliteratedSegments` counts
+distinct accepted segments converted in normal processing or by repair.
+Transliteration never adds an HTTP/inference attempt.
+
+To repair an exact existing experiment **without any network requests**:
+
+```powershell
+$run = 'C:\llama.cpp\books\translation-benchmarks\Adventures.sr-latn.20261020T175541710Z-514627db'
+.\translate-books.ps1 -ExperimentDirectory $run -RepairOnly
+```
+
+To explicitly repair and then continue inference for pending segments:
+
+```powershell
+.\translate-books.ps1 -ExperimentDirectory $run -RepairAndResume
+# Optionally bound new work:
+.\translate-books.ps1 -ExperimentDirectory $run -RepairAndResume -MaxSegments 3
+```
+
+`-ExperimentDirectory` chooses that exact run, not the newest experiment.
+Saved model, token limit, timeout and context are reused unless explicitly
+overridden. Before any new inference, normal resume checks still verify the
+full settings/model/server fingerprint. `-RepairOnly` does not require a running
+server; it verifies the source hash, fixed prompt and record alignment.
+
+Repair considers only failed segments with stored attempts whose **only**
+recorded failure was `Cyrillic script violation`, whose finish reason was `stop`,
+and whose truncation flag was false. It revalidates the raw response after
+conversion and selects the earliest eligible attempt. Other failures are not
+automatically repaired or retried. A repaired segment is skipped on resume.
+
+Original segment files and attempt histories are left byte-for-byte unchanged.
+`repairs\00000001.json`, etc., store the original attempt/failure, exact raw
+response, accepted result, action version, timestamp, source alignment and
+original segment hash. These atomic audit files act as completion overlays.
+They are validated on every resume, including after an interruption between
+audit creation and checkpoint update. Repeated repair is idempotent.
+`repairs\before-repair\` retains the original checkpoint and benchmark exports;
+`*.repairs.json` exports the repair audit records separately.
+
+Historical `SuccessfulSegments`, `FailedSegments`, failure rate, and inference
+statistics do not retrospectively count repairs as model successes.
+`EffectiveCompletedSegments`, `RepairedSegments`, `RemainingFailedSegments`,
+and `EffectiveTranslatedWords` describe the repaired result. Original attempt
+CSV rows retain their failed statuses; old rows have empty newly introduced
+fields where these were not measured. Final assembly and progress use effective
+completion, so repaired lines appear once in their original position.
+No final book is published while any segment remains unsuccessful or pending.
 
 ## Validation on 2026-10-20
 
@@ -86,14 +156,19 @@ compatibility defect found during testing. That defect is fixed; the checkpoint
 retains this attempt as interrupted with unknown timing. There were five
 dispatched attempts across the three distinct source segments.
 
-The native regression runner uses mocked responses for recovery, final assembly,
-retry limits and overwrite checks; it sends no further live requests:
+The current native regression runner uses mocked responses for transliteration,
+repair, recovery, final assembly and overwrite checks; it sends no live requests:
 
 ```powershell
-.\books\translation-benchmarks\tool-validation-20261020\verify.ps1
+.\tests\translate-books.tests.ps1
 ```
 
-It writes `verification-results.json` and isolated mock experiment directories.
+It writes `test-results.json` inside an isolated
+`books\translation-benchmarks\transliteration-tests-<ID>` directory.
 Tests ran on Windows PowerShell 5.1. PowerShell 7 compatibility is intended but
 was not executed locally. Checkpoint interruption was simulated; a real
 interactive Ctrl+C was not tested. No complete book translation was started.
+
+The requested `Adventures.sr-latn.20261020T175541710Z-514627db` directory and
+earlier regression runner were absent from the workspace during this update.
+Repair was verified with representative legacy records, not that actual run.
