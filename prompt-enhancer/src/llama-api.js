@@ -1,36 +1,6 @@
 (() => {
   'use strict';
-  const defaults = Object.freeze({
-    baseUrl: 'http://127.0.0.1:8080', temperature: 0.2,
-    maxTokens: 2048, timeoutMs: 60000, maxInputLength: 20000
-  });
-  class ApiError extends Error {
-    constructor(code, message) { super(message); this.code = code; }
-  }
-  function settings(value = {}) {
-    const result = { ...defaults, ...value };
-    if (result.baseUrl !== defaults.baseUrl) {
-      throw new ApiError('SETTINGS', 'This MVP only permits http://127.0.0.1:8080.');
-    }
-    for (const [key, min, max, integer] of [
-      ['temperature', 0, 2, false], ['maxTokens', 1, 4096, true],
-      ['timeoutMs', 1000, 60000, true], ['maxInputLength', 1, 20000, true]
-    ]) {
-      if (!Number.isFinite(result[key]) || result[key] < min || result[key] > max ||
-          (integer && !Number.isInteger(result[key]))) {
-        throw new ApiError('SETTINGS', `Invalid setting: ${key}.`);
-      }
-    }
-    return result;
-  }
-  function validatePrompt(prompt, config) {
-    if (typeof prompt !== 'string' || !prompt.trim()) {
-      throw new ApiError('INPUT', 'Enter a prompt first.');
-    }
-    if (prompt.length > config.maxInputLength) {
-      throw new ApiError('INPUT', `Prompt exceeds ${config.maxInputLength.toLocaleString()} characters.`);
-    }
-  }
+  const { defaults, settings, validatePrompt, ApiError } = globalThis.PromptEnhancerSettings;
   async function run(prompt, rawSettings, { signal, fetchImpl = fetch, testOnly = false } = {}) {
     const config = settings(rawSettings);
     if (!testOnly) validatePrompt(prompt, config);
@@ -79,7 +49,9 @@
       if (typeof text !== 'string' || !text.trim()) {
         throw new ApiError('EMPTY', 'The local model returned no usable text.');
       }
-      return { text: text.trim(), model };
+      // Validate emptiness above without stripping indentation or trailing
+      // blank lines from a code-containing rewrite.
+      return { text: text.replace(/\r\n?/g, '\n'), model };
     } catch (error) {
       if (timedOut) throw new ApiError('TIMEOUT', 'Local model request timed out. Retry or use a faster model.');
       if (controller.signal.aborted) throw new ApiError('CANCELLED', 'Request cancelled.');

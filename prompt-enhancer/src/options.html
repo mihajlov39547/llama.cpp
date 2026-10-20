@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Local Llama Prompt Enhancer — Options</title>
   <link rel="stylesheet" href="options.css">
-  <script src="llama-api.js" defer></script>
+  <script src="settings.js" defer></script>
   <script src="options.js" defer></script>
 </head>
 <body>
@@ -13,12 +13,12 @@
     <h1>Local Llama Prompt Enhancer</h1>
     <p>Prompts are sent only when you click Improve Prompt or Retry.</p>
     <form id="settings">
-      <label>API base URL <input id="baseUrl" readonly value="http://127.0.0.1:8080"></label>
+      <label>API base URL <input id="baseUrl" readonly></label>
       <p>The origin is fixed in this MVP. Other origins require a manifest permission change and URL validation changes.</p>
-      <label>Temperature <input id="temperature" type="number" min="0" max="2" step="0.1" required></label>
-      <label>Max output tokens <input id="maxTokens" type="number" min="1" max="4096" required></label>
-      <label>Timeout (seconds) <input id="timeout" type="number" min="1" max="60" required></label>
-      <label>Maximum input characters <input id="maxInputLength" type="number" min="1" max="20000" required></label>
+      <label>Temperature <input id="temperature" type="number" required></label>
+      <label>Max output tokens <input id="maxTokens" type="number" required></label>
+      <label>Timeout (seconds) <input id="timeout" type="number" required></label>
+      <label>Maximum input characters <input id="maxInputLength" type="number" required></label>
       <button type="submit">Save settings</button>
       <button type="button" id="test">Test saved connection</button>
     </form>

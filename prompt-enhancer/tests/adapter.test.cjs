@@ -6,7 +6,7 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 function context(extra = {}) {
   const ctx = vm.createContext({ AbortController, setTimeout, clearTimeout, fetch, URL, ...extra });
-  for (const file of ['prompt-template.js', 'llama-api.js']) {
+  for (const file of ['settings.js', 'prompt-template.js', 'llama-api.js']) {
     vm.runInContext(fs.readFileSync(path.join(root, 'src', file), 'utf8'), ctx);
   }
   return ctx;
@@ -126,11 +126,15 @@ function editorContext(editor, command = () => true) {
   const ctx = vm.createContext({
     setTimeout, document: {
       querySelectorAll: () => [editor], execCommand: command,
-      createRange: () => ({ selectNodeContents() {} })
+      createRange: () => ({ selectNodeContents() {}, collapse() {} })
     },
     window: { getSelection: () => ({ removeAllRanges() {}, addRange() {} }) }
   });
-  Object.assign(editor, { isConnected: true, getClientRects: () => [1], closest: () => null, focus() {} });
+  Object.assign(editor, {
+    isConnected: true, getClientRects: () => [1], closest: () => null,
+    focus() { ctx.document.activeElement = editor; }, contains: node => node === editor,
+    addEventListener() {}, removeEventListener() {}
+  });
   vm.runInContext(fs.readFileSync(path.join(root, 'src/editor.js'), 'utf8'), ctx);
   return ctx.PromptEnhancerEditor;
 }

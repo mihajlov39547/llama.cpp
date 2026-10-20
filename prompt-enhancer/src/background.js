@@ -1,5 +1,5 @@
 'use strict';
-importScripts('prompt-template.js', 'llama-api.js');
+importScripts('settings.js', 'prompt-template.js', 'llama-api.js');
 const active = new Map();
 const API = globalThis.PromptEnhancerAPI;
 chrome.runtime.onInstalled.addListener(async () => {
@@ -32,7 +32,12 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   const key = isTest ? 'options' : sender.tab.id;
   if (message.type === 'PE_CANCEL') {
     const request = active.get(key);
-    if (request?.id === message.requestId) request.controller.abort();
+    if (request?.id === message.requestId) {
+      // Release synchronously: an immediate Retry must not wait for fetch's
+      // rejection/finally microtask. Old finally blocks use identity checks.
+      active.delete(key);
+      request.controller.abort();
+    }
     respond({ ok: true });
     return false;
   }
@@ -45,12 +50,16 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   (async () => {
     try {
       const { settings } = await chrome.storage.local.get('settings');
+      request.controller.signal.throwIfAborted();
       const result = await API.run(message.prompt, settings, {
         signal: request.controller.signal, testOnly: isTest
       });
+      request.controller.signal.throwIfAborted();
       respond({ ok: true, ...result });
     } catch (error) {
-      respond({ ok: false, error: { code: error.code || 'INTERNAL', message: error.message || 'Local request failed.' } });
+      respond({ ok: false, error: request.controller.signal.aborted ?
+        { code: 'CANCELLED', message: 'Request cancelled.' } :
+        { code: error.code || 'INTERNAL', message: error.message || 'Local request failed.' } });
     } finally {
       if (active.get(key) === request) active.delete(key);
     }
@@ -58,5 +67,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   return true;
 });
 chrome.tabs.onRemoved.addListener(tabId => {
-  active.get(tabId)?.controller.abort();
+  const request = active.get(tabId);
+  active.delete(tabId);
+  request?.controller.abort();
 });

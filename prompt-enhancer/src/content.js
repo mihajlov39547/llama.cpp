@@ -2,6 +2,7 @@
   'use strict';
   globalThis.__promptEnhancerCleanup?.();
   const { findEditor, readEditorText, replaceEditorText } = globalThis.PromptEnhancerEditor;
+  const Settings = globalThis.PromptEnhancerSettings;
   const host = document.createElement('div');
   host.dataset.promptEnhancerHost = '';
   const shadow = host.attachShadow({ mode: 'open' });
@@ -106,14 +107,18 @@
       route = location.href;
     }
     if (editor) {
-      const container = editor.closest('[data-composer-body]') ||
-        editor.closest('form') || editor.parentElement;
-      if (host.parentElement !== container) container.append(host);
-      host.hidden = false;
+      // Keep our row out of ChatGPT's editor/footer layout. In particular,
+      // appending to a flex/grid composer body can put us beside Send.
+      const anchor = editor.closest('form') || editor.closest('[data-composer-body]') ||
+        editor.closest('[data-composer-input]') || editor;
+      if (host.parentElement !== anchor.parentElement || host.nextSibling !== anchor) {
+        anchor.parentElement.insertBefore(host, anchor);
+      }
+      if (host.hidden) host.hidden = false;
     } else {
       // Keep recovery/error accessible during composer removal.
       if (!host.isConnected && snapshot) document.body.append(host);
-      host.hidden = !snapshot;
+      if (host.hidden !== !snapshot) host.hidden = !snapshot;
     }
     if (snapshot && !snapshot.changed && !applying &&
         readEditorText(editor) !== snapshot.text) dirty();
@@ -131,8 +136,8 @@
     panel.hidden = false;
     if (!editor) { message('ChatGPT editor could not be found.', true); return; }
     const text = readEditorText(editor);
-    if (!text.trim()) { message('Enter a prompt first.', true); return; }
-    if (text.length > 20000) { message('Prompt exceeds 20,000 characters.', true); return; }
+    try { Settings.validatePrompt(text, Settings.defaults); }
+    catch (error) { message(error.message, true); return; }
     snapshot = { text, editor, route: location.href, changed: false };
     original.value = text;
     rewrite = '';
@@ -144,10 +149,13 @@
       stopRequest();
       message('The background request stopped responding or timed out. Your draft is unchanged. Retry; if the extension was reloaded, refresh ChatGPT.', true);
       update();
-    }, 65000);
+    }, Settings.responseTimeoutMs);
     message('Improving with your local model…');
     update();
     try {
+      const { settings } = await chrome.storage.local.get('settings');
+      if (pending !== request || disposed) return;
+      Settings.validatePrompt(text, Settings.settings(settings));
       const result = await chrome.runtime.sendMessage({
         type: 'PE_IMPROVE', requestId: request.id, prompt: text
       });
@@ -215,7 +223,14 @@
     window.removeEventListener('pagehide', onPageHide);
     window.removeEventListener('pageshow', onPageShow);
   }
-  function onPageHide(event) { if (!event.persisted) cleanup(); else stopRequest(); }
+  function onPageHide(event) {
+    if (!event.persisted) cleanup();
+    else if (pending) {
+      stopRequest();
+      message('Request cancelled when leaving this page. Retry to improve the current draft.');
+      update();
+    }
+  }
   function onPageShow() { reconcile(); }
   window.addEventListener('pagehide', onPageHide);
   window.addEventListener('pageshow', onPageShow);
