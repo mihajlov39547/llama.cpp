@@ -2,6 +2,7 @@
 $ErrorActionPreference='Stop'
 $project=Split-Path -Parent $PSScriptRoot
 . (Join-Path $project 'translate-books.ps1') -FunctionsOnly
+$ModelId='translategemma-4b-it-Q4_K_M.gguf'
 $passed=0
 function Check([bool]$Ok,[string]$Name) {
     if (-not $Ok) { throw "FAIL: $Name" }
@@ -23,6 +24,23 @@ function Response([string]$Text,[string]$Finish='stop') {
 $tokens=$null;$errors=$null
 [void][Management.Automation.Language.Parser]::ParseFile((Join-Path $project 'translate-books.ps1'),[ref]$tokens,[ref]$errors)
 Check ($errors.Count -eq 0) 'PowerShell syntax'
+$discoveredIds=@('other-model-Q8_0.gguf')
+function Invoke-TBJson($Uri,$Body,$Timeout) {
+    if ($Uri.EndsWith('/health')) { return [pscustomobject]@{status='ok'} }
+    if ($Uri.EndsWith('/v1/models')) {
+        return [pscustomobject]@{data=@($discoveredIds | ForEach-Object { [pscustomobject]@{id=$_} })}
+    }
+    return [pscustomobject]@{chat_template='chatml';default_generation_settings=[pscustomobject]@{n_ctx=8192}}
+}
+$discovered=Get-TBServer 'http://127.0.0.1:8080' '' 0
+Check ($discovered.ModelId -ceq $discoveredIds[0] -and $discovered.ChatTemplate -eq 'chatml' -and $discovered.ContextRetrieved -eq 8192) 'Auto discovery accepts another model template and context'
+Throws { Get-TBServer 'http://127.0.0.1:8080' 'missing' 0 } 'Cannot select' 'Explicit model mismatch rejected'
+Throws { Get-TBServer 'http://127.0.0.1:8080' '' 4096 } 'Server context' 'Explicit context mismatch rejected'
+$discoveredIds=@('model-a','model-b')
+Throws { Get-TBServer 'http://127.0.0.1:8080' '' 0 } 'Cannot select' 'Multiple models require explicit selection'
+Check ((Get-TBServer 'http://127.0.0.1:8080' 'model-b' 0).ModelId -ceq 'model-b') 'Explicit multi-model selection'
+$discoveredIds=@()
+Throws { Get-TBServer 'http://127.0.0.1:8080' '' 0 } 'Cannot select' 'Empty model list rejected'
 $lower=U @(0x459,0x45A,0x45F,0x452,0x45B,0x447,0x448,0x436)
 $expected='ljnjd'+(U @(0x17E,0x111,0x107,0x10D,0x161,0x17E))
 Check ((Convert-TBSerbianLatin $lower) -ceq $expected) 'All special Serbian mappings'
@@ -62,9 +80,10 @@ Write-TBAtomic $fixturePath "Source one.`r`n`r`nSource two.`n `t`nSource three.`
 $source=Read-TBSource $fixturePath
 Check ($source.SegmentCount -eq 3 -and $source.Lines.Count -eq 5) 'Blank lines and line endings retained'
 $script:requests=[Collections.Generic.List[object]]::new()
+$mockTemplate='gemma'; $mockContext=4096
 function Get-TBServer {
     return [pscustomobject]@{ModelId=$ModelId;ModelMeta=$null;ModelIdentitySource='mock';
-        ContextRetrieved=4096;Quantization='Q4_K_M';BuildVersion='mock';ChatTemplate='gemma';Props=$null}
+        ContextRetrieved=$mockContext;Quantization='Q4_K_M';BuildVersion='mock';ChatTemplate=$mockTemplate;Props=$null}
 }
 function Invoke-TBJson($Uri,$Body,$Timeout) {
     $script:requests.Add($Body)
@@ -74,6 +93,9 @@ Start-TBMain
 $cpPath=(Get-ChildItem $BenchmarkDirectory -Filter '*.checkpoint.json' -Recurse).FullName
 $run=Split-Path $cpPath;$state=Read-TBJson $cpPath
 $firstPath=Get-TBSegmentPath $run 1;$first=Read-TBJson $firstPath
+$savedModel=$ModelId;$ModelId='different-model';$Resume=$true;$NewRun=$false
+Throws { Start-TBMain } 'Resume refused' 'Resume refuses silently switching models'
+$ModelId=$savedModel;$Resume=$false;$NewRun=$true
 Check ($requests.Count -eq 1 -and $first.Status -eq 'completed' -and $first.Attempts.Count -eq 1) 'Cyrillic success uses one inference request'
 Check ($first.Attempts[0].RawTranslatedText -ceq $title -and $first.Attempts[0].TranslatedText -ceq (Convert-TBSerbianLatin $title)) 'Stored raw and final text separate'
 Check ($first.Attempts[0].TokenGenerationMs -eq 200 -and $first.Attempts[0].TransliterationTimeMs -ge 0) 'Inference timing separate from transliteration'
@@ -153,6 +175,13 @@ $tampered=Read-TBJson (Get-TBRepairPath $run 2);$tampered.TranslatedText='Change
 Write-TBAtomic (Get-TBRepairPath $run 2) (Get-TBJson $tampered)
 Throws { Read-TBRepairOverlay (Read-TBJson $secondPath) $run $ModelId } 'Invalid repaired' 'Altered audit rejected'
 Write-TBAtomic (Get-TBRepairPath $run 2) (Get-TBJson $audit)
+$Book='another-model.txt';$ModelId='another-model-Q8_0.gguf'
+$mockTemplate='chatml';$mockContext=8192;$ContextSize=0;$Resume=$false;$NewRun=$true;$MaxSegments=1
+Write-TBAtomic (Join-Path $SourceDirectory $Book) 'A new source line.'
+Start-TBMain
+$otherCp=Read-TBJson (Get-ChildItem $BenchmarkDirectory -Filter 'another-model.sr-latn.checkpoint.json' -Recurse).FullName
+Check ($otherCp.Status -eq 'completed' -and $otherCp.Metadata.Model.ModelId -eq $ModelId -and $otherCp.Metadata.Configuration.ContextSize -eq 8192) 'Other model completes translation with detected context'
+Check ($requests[$requests.Count-1].model -eq $ModelId -and $otherCp.Metadata.Configuration.ChatTemplate -like 'server-configured*') 'Request and metadata use selected model and server template'
 $result=[ordered]@{Passed=$passed;PowerShell=$PSVersionTable.PSVersion.ToString();Artifacts=$testRoot}
 Write-TBAtomic (Join-Path $testRoot 'test-results.json') (Get-TBJson $result)
 Write-Host "ALL $passed TESTS PASSED. Artifacts: $testRoot"

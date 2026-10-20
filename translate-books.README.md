@@ -1,6 +1,6 @@
 # Book translation benchmark
 
-Run in PowerShell with the existing TranslateGemma server already listening:
+Run in PowerShell with your chosen model loaded in the existing llama.cpp server:
 
 ```powershell
 cd C:\llama.cpp
@@ -18,10 +18,26 @@ an existing translated book. No server is started by this tool.
 .\translate-books.ps1 -Book Adventures.txt -Resume
 ```
 
-Defaults: `MaxTokens=512`, `ContextSize=4096`, `TimeoutSeconds=180`.
+The model ID is discovered automatically from `/v1/models`. There is no
+TranslateGemma restriction and the server's configured chat template is used.
+The script does not load or switch models; choose the model in your server
+launcher first. If the server lists multiple models, select its exact ID with
+`-ModelId 'model-id-from-v1-models'`.
+
+Defaults: `MaxTokens=512`, `ContextSize=0` (automatic), `TimeoutSeconds=180`.
+Context is discovered from `/props`; if unavailable, the script warns and uses
+4096. An explicit `-ContextSize` must match the reported server context.
 Temperature is fixed at zero, seed at zero, streaming off, prompt caching off.
-The generic `gemma` template must be configured on the server; requests contain
-one user message, not `chat_template_kwargs`.
+Requests contain one user message, with no client-side template override or
+`chat_template_kwargs`. Configure a suitable chat template in llama.cpp for the
+model you choose. Translation quality and adherence to instructions still depend
+on that model; reasoning-only, empty, or invalid output is not accepted.
+
+Resume still requires the original experiment's model and settings. To benchmark
+a different model, start `-NewRun`; use a different `-DestinationDirectory` if a
+completed output for that book already exists. The default output directory keeps
+its historical `gemma-translated-sr-latn` name for compatibility even for other
+models. The actual model identity is recorded in each experiment's metadata.
 
 Input: `books\prepared-en\Adventures.txt`.
 Final output: `books\gemma-translated-sr-latn\Adventures.sr-latn.txt`.
@@ -65,8 +81,12 @@ No other inference client should use the server during a benchmark. A fixed seed
 and sampling settings do not guarantee identical GPU results across builds or
 hardware. There is no warm-up inference.
 
-Long source lines are conservatively rejected if a UTF-8-byte upper bound for
-the formatted prompt plus output reserve exceeds the context. This can reject
+Long source lines are conservatively rejected if a UTF-8-byte estimate for
+the prompt plus template/output reserves exceeds the context. Gemma's existing
+guard is retained; other templates reserve 512 tokens for template overhead.
+This is an estimate rather than tokenizer-based measurement: unusual templates
+may exceed that reserve, with server context errors recorded as failed requests.
+This can reject
 some lines that would actually fit; it prevents silently splitting or truncating
 them. Interior newlines in a model response are rejected to retain physical line
 alignment. Trailing CR/LF is removed, with the raw response retained for auditing.

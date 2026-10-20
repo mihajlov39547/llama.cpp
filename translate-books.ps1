@@ -42,10 +42,10 @@ param(
     [string] $DestinationDirectory,
     [string] $BenchmarkDirectory,
     [string] $ApiBase = 'http://127.0.0.1:8080',
-    [string] $ModelId = 'translategemma-4b-it-Q4_K_M.gguf',
+    [string] $ModelId,
     [ValidateRange(1, 32768)][int] $MaxTokens = 512,
     [ValidateRange(1, 3600)][int] $TimeoutSeconds = 180,
-    [ValidateRange(128, 131072)][int] $ContextSize = 4096,
+    [ValidateRange(0, 1048576)][int] $ContextSize = 0,
     [string] $Book,
     [switch] $Resume,
     [switch] $NewRun,
@@ -72,7 +72,7 @@ Use correct Serbian grammar and spelling, including $script:TBDiacritics.
 
 Do not use Serbian Cyrillic.
 
-Return ONLY the Serbian latin translation, without explanations, introductions, quotation wrappers, markdown, or additional text.
+Return ONLY the Serbian translation, without explanations, introductions, quotation wrappers, markdown, or additional text.
 
 English text:
 
@@ -196,20 +196,25 @@ function Get-TBServer([string] $Base, [string] $ExpectedModel, [int] $ExpectedCo
     $identity = $ExpectedModel; $identitySource = 'configured (models endpoint unavailable)'
     $modelMeta = $null
     try { $modelsResponse = Invoke-TBJson "$Base/v1/models" }
-    catch { $modelsResponse = $null; Write-Warning "Cannot discover model; recording explicitly configured identity: $ExpectedModel" }
+    catch {
+        $modelsResponse = $null
+        if (-not $ExpectedModel) { throw 'Cannot discover the loaded model from /v1/models. Check the server or supply its exact -ModelId.' }
+        Write-Warning "Cannot discover model; recording explicitly configured identity: $ExpectedModel"
+    }
+    if ($null -eq $modelsResponse -and -not $ExpectedModel) { throw 'Model discovery returned no data. Check /v1/models or supply -ModelId.' }
     if ($null -ne $modelsResponse) {
-        $available = @(Get-TBValue $modelsResponse 'data')
-        $selected = @($available | Where-Object { $_.id -ceq $ExpectedModel })
-        if ($selected.Count -ne 1) { throw "Expected model '$ExpectedModel' not found in /v1/models. Available: $($available.id -join ', ')" }
+        $available = @(Get-TBValue $modelsResponse 'data' | Where-Object { $_.id -is [string] -and -not [string]::IsNullOrWhiteSpace($_.id) })
+        if ($ExpectedModel) { $selected = @($available | Where-Object { $_.id -ceq $ExpectedModel }) }
+        else { $selected = $available }
+        if ($selected.Count -ne 1) { throw "Cannot select exactly one model. Use -ModelId with a listed ID. Available: $($available.id -join ', ')" }
         $identity = $selected[0].id; $identitySource = '/v1/models'; $modelMeta = Get-TBValue $selected[0] 'meta'
     }
     try { $props = Invoke-TBJson "$Base/props" } catch { $props = $null }
     $actualContext = Get-TBValue (Get-TBValue $props 'default_generation_settings') 'n_ctx'
-    if ($null -ne $actualContext -and [int]$actualContext -ne $ExpectedContext) {
+    if ($ExpectedContext -gt 0 -and $null -ne $actualContext -and [int]$actualContext -ne $ExpectedContext) {
         throw "Server context is $actualContext, but experiment requires $ExpectedContext. Do not change the server silently."
     }
     $template = Get-TBValue $props 'chat_template'
-    if ($template -and $template -cne 'gemma') { throw "Expected generic gemma chat template, received '$template'. Use --no-jinja --chat-template gemma in your server launcher." }
     $quantization = $null
     if ($identity -match '(?i)(Q\d+_[A-Z0-9_]+|BF16|F16)') { $quantization = $Matches[1].ToUpperInvariant() }
     return [pscustomobject]@{
@@ -575,7 +580,7 @@ function Start-TBMain {
     if ($Resume -and $NewRun) { throw 'Choose -Resume or -NewRun, not both.' }
     $base = $ApiBase.TrimEnd('/')
     if ($base -ne 'http://127.0.0.1:8080') { throw 'This experiment requires http://127.0.0.1:8080. No alternate origin is accepted.' }
-    if ($MaxTokens -ge $ContextSize) { throw 'MaxTokens must be smaller than the context.' }
+    if ($ContextSize -gt 0 -and $MaxTokens -ge $ContextSize) { throw 'MaxTokens must be smaller than the context.' }
     foreach ($directory in @($DestinationDirectory, $BenchmarkDirectory)) {
         [void][IO.Directory]::CreateDirectory([IO.Path]::GetFullPath($directory))
     }
@@ -642,6 +647,12 @@ function Start-TBMain {
     $source = Read-TBSource $choice.File.FullName
     if (-not $source.SegmentCount) { throw 'The source contains no non-empty segments.' }
     $server = Get-TBServer $base $ModelId $ContextSize
+    if ($ContextSize -eq 0) {
+        if ($server.ContextRetrieved -gt 0) { $ContextSize=[int]$server.ContextRetrieved }
+        else { $ContextSize=4096; Write-Warning 'Server context unavailable; using 4096. Specify -ContextSize if different.' }
+    }
+    if ($MaxTokens -ge $ContextSize) { throw 'MaxTokens must be smaller than the discovered context.' }
+    $gemmaGuard=($server.ChatTemplate -ceq 'gemma')
     $configuration = [ordered]@{
         ApiEndpoint="$base/v1/chat/completions"; Temperature=0; MaxTokens=$MaxTokens
         ContextSize=$ContextSize; TimeoutSeconds=$TimeoutSeconds; MaxRetries=2; Seed=0; CachePrompt=$false
@@ -652,6 +663,10 @@ function Start-TBMain {
         ContextGuard='UTF-8 byte upper bound for generic Gemma-formatted prompt + 64 safety tokens + MaxTokens <= ContextSize'
         WordCountPolicy="Unicode letter/number words, including internal apostrophes/hyphens"
         InputEncoding=$source.Encoding; WarmupRequests=0
+    }
+    if (-not $gemmaGuard) {
+        $configuration.ChatTemplate='server-configured template (no client template override)'
+        $configuration.ContextGuard='UTF-8 prompt bytes + 512 template reserve + MaxTokens <= ContextSize (conservative estimate; server validates actual tokens)'
     }
     $identity = [ordered]@{
         SourceSha256=$source.Hash; Configuration=$configuration
@@ -739,8 +754,10 @@ function Start-TBMain {
             }
             $segmentPath=Get-TBSegmentPath $runDirectory $line.SegmentId
             $prompt=Get-TBPrompt $line.Text
-            $formatted="<bos><start_of_turn>user`n$prompt<end_of_turn>`n<start_of_turn>model`n"
-            $bound=$script:TBEncoding.GetByteCount($formatted)+64
+            if ($gemmaGuard) {
+                $formatted="<bos><start_of_turn>user`n$prompt<end_of_turn>`n<start_of_turn>model`n"
+                $bound=$script:TBEncoding.GetByteCount($formatted)+64
+            } else { $bound=$script:TBEncoding.GetByteCount($prompt)+512 }
             while ($record.Attempts.Count -lt 3 -and $record.Status -ne 'completed') {
                 $attempt=New-TBAttempt $line ($record.Attempts.Count+1) $state.Metadata.ExperimentId
                 $attempt.PromptByteUpperBound=$bound
