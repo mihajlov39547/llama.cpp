@@ -1,4 +1,6 @@
-# Local Llama Prompt Enhancer
+# Local Prompt Enhancer
+
+Improve your prompts with local AI.
 
 Vanilla JavaScript Manifest V3 extension for `https://chatgpt.com/`. Improve a draft with a local llama.cpp model, review the suggestion, then Apply, Copy, Refine Further, or Cancel. Apply never submits a message.
 
@@ -20,7 +22,19 @@ Keep the server running and wait for the model to load. If it is already running
 4. Open or refresh `https://chatgpt.com/`. Existing tabs need a refresh after installing or reloading the extension.
 5. Type a draft and click **Improve Prompt** in the added row immediately above the composer form.
 
-No build step or npm installation is needed. `icons/` remains available for future branding; the manifest does not reference missing icon files.
+No build step or npm installation is needed. The manifest uses `icons/icon16.png`, `icon32.png`, `icon48.png`, and `icon128.png`.
+
+## Branding and icons
+
+The original icon combines a geometric teal/blue pencil and a subtle sparkle on a navy rounded tile, with transparent outer corners and a contrasting border. It uses no third-party logos or downloaded artwork. The supplied `promp-enhancer*` images are preserved as reference assets; the extension uses the new design rather than downscaling those images.
+
+`icons/icon-master.svg` is an editable development master, not a manifest icon. `icons/build-icons.ps1` exports the matching geometry to supersampled PNGs using Windows System.Drawing, with no package installation or runtime dependency:
+
+```powershell
+& .\icons\build-icons.ps1
+```
+
+The four PNGs have verified dimensions of 16×16, 32×32, 48×48 and 128×128, with alpha transparency. Their combined size is 11,035 bytes. `icons/icon-preview.png` shows actual-size exports on light and dark backgrounds for visual review.
 
 ## Usage and configuration
 
@@ -129,7 +143,7 @@ Refinement-specific checks (reload the extension and refresh ChatGPT first):
 
 ### Exact Chrome hardening verification
 
-1. Open `chrome://extensions`, click **Reload** on Local Llama Prompt Enhancer, then refresh the ChatGPT tab. In extension **Details → Extension options**, save default values and click **Test saved connection**. Confirm no extension errors.
+1. Open `chrome://extensions`, click **Reload** on Local Prompt Enhancer, then refresh the ChatGPT tab. In extension **Details → Extension options**, save default values and click **Test saved connection**. Confirm no extension errors.
 2. Open ChatGPT DevTools, enable the device toolbar, and test viewport widths **360 px** and **1280 px**. Repeat with ChatGPT Settings → General → Theme set to Light and Dark. Confirm exactly one Improve Prompt row above the composer; expand the preview and Original prompt details, and confirm neither covers the editable area or Send.
 3. Enter this text using Shift+Enter for line breaks, with two empty lines between the first and second sections:
 

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <title>Local Prompt Enhancer</title>
+  <desc>Original geometric blue and teal pencil with a single sparkle on a navy tile.</desc>
+  <defs>
+    <linearGradient id="pencil" gradientUnits="userSpaceOnUse" x1="36" y1="94" x2="98" y2="32">
+      <stop stop-color="#4385ff"/>
+      <stop offset="1" stop-color="#28dac1"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="#102a43" stroke="#4b8eaf" stroke-width="3"/>
+  <path d="M40 78 L82 36 L98 52 L56 94 Z" fill="url(#pencil)"/>
+  <path d="M36 98 L40 78 L56 94 Z" fill="#e6fffa"/>
+  <path d="M82 36 L89 29 Q93 25 97 29 L105 37 Q109 41 105 45 L98 52 Z" fill="#4385ff"/>
+  <path d="M82 36 L98 52" stroke="#102a43" stroke-width="3"/>
+  <path d="M34 18 L38 30 L50 34 L38 38 L34 50 L30 38 L18 34 L30 30 Z" fill="#8fede2"/>
+</svg>
