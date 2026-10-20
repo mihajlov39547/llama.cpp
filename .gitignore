@@ -7,3 +7,4 @@ bin/LICENSE-LLVM-OpenMP
 benchmark-results/
 __pycache__/
 prompt-enhancer/release/local-prompt-enhancer-*.zip
+books/
