@@ -8,3 +8,5 @@ benchmark-results/
 __pycache__/
 prompt-enhancer/release/local-prompt-enhancer-*.zip
 books/
+opencode/
+opencode-launcher-settings.json

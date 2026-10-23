@@ -16,7 +16,7 @@ from difflib import SequenceMatcher
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
-PROMPT_VERSION = 'literary-restore-v1.0'
+PROMPT_VERSION = 'literary-restore-v1.1-safe-punctuation'
 SYSTEM = '''You are a conservative RESTORATION editor for historical English fiction, NOT a writing improver.
 Repair the TARGET line ONLY, based on obvious OCR/text-extraction errors.
 
@@ -27,6 +27,10 @@ capitalization unless demonstrably broken, proper names, numbers and dialogue.
 NEVER paraphrase, modernize, simplify, translate, add words, omit words, censor or summarize.
 NEVER fix historical style just because it sounds unusual. Neighboring lines are READ-ONLY.
 Correct exactly one TARGET record; NEVER move content between lines or include newlines.
+Important: do not remove existing commas, periods, semicolons, colons, dashes,
+quotation marks or apostrophes. Do not remove punctuation to make text flow better.
+Never claim a correction was made unless corrected actually differs from TARGET.
+When a missing separator is plausible but uncertain, set needs_review=true.
 If uncertain, leave the TARGET unchanged and set needs_review=true.
 Return a single JSON object, without markdown or commentary:
 {"corrected":"the entire corrected TARGET line", "needs_review":false, "reason":"short explanation"}
@@ -98,7 +102,12 @@ def classify(original, proposed, wants_review, max_char_change):
     compact = lambda s: ''.join(c.casefold() for c in s if c.isalnum())
     if compact(original) != compact(proposed):
         return original, 'review', 'lexical_change'
-    return proposed, 'accepted', 'formatting_only'
+    # Auto-accept ONLY whitespace differences. All punctuation modifications,
+    # even punctuation-only changes, need human review; punctuation carries meaning.
+    no_space = lambda value: ''.join(c for c in value if not c.isspace())
+    if no_space(original) != no_space(proposed):
+        return original, 'review', 'punctuation_change'
+    return proposed, 'accepted', 'whitespace_only'
 
 
 def chat(endpoint, model, previous, target, following, timeout, max_tokens, retries):
