@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conservative one-line-at-a-time literary restoration via local llama.cpp.
+"""Balanced line-preserving literary editing via local llama.cpp.
 
 Standard library only. Original files never modified. Run --help for instructions.
 """
@@ -16,25 +16,38 @@ from difflib import SequenceMatcher
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
-PROMPT_VERSION = 'literary-restore-v1.1-safe-punctuation'
-SYSTEM = '''You are a conservative RESTORATION editor for historical English fiction, NOT a writing improver.
-Repair the TARGET line ONLY, based on obvious OCR/text-extraction errors.
+PROMPT_VERSION = 'training-readable-v2.1'
+SYSTEM = """You edit ONE line of damaged English fiction to create CLEAN ENGLISH training text.
 
-PERMITTED: restore missing spaces ("wholewas" -> "whole was"), obvious apostrophes
-("dont" -> "don't"), clearly missing punctuation, corrupt quote marks, malformed spacing.
-Preserve ALL authorial words, their order, meaning, British spellings, archaic grammar,
-capitalization unless demonstrably broken, proper names, numbers and dialogue.
-NEVER paraphrase, modernize, simplify, translate, add words, omit words, censor or summarize.
-NEVER fix historical style just because it sounds unusual. Neighboring lines are READ-ONLY.
-Correct exactly one TARGET record; NEVER move content between lines or include newlines.
-Important: do not remove existing commas, periods, semicolons, colons, dashes,
-quotation marks or apostrophes. Do not remove punctuation to make text flow better.
-Never claim a correction was made unless corrected actually differs from TARGET.
-When a missing separator is plausible but uncertain, set needs_review=true.
-If uncertain, leave the TARGET unchanged and set needs_review=true.
-Return a single JSON object, without markdown or commentary:
-{"corrected":"the entire corrected TARGET line", "needs_review":false, "reason":"short explanation"}
-'''
+Primary goal: a grammatically clear, self-contained, readable English record. You may reconstruct damaged grammar, split run-ons into complete sentences, insert missing words, repair OCR/formatting, and lightly rephrase where needed. Exact wording and historical punctuation are NOT required.
+
+Hard rules:
+1. TARGET_LINE is the only text you edit. PREVIOUS and NEXT are context only; do not copy their text.
+2. Return precisely ONE physical line (no newline); multiple complete sentences on that line are fine.
+3. Keep the same scene, main events, referents, and approximate information coverage. Do not invent new actions or omit whole clauses.
+4. Correct obvious word merges, possessives, quotations, punctuation, and grammar. Do NOT output Markdown italics, headings, comments, or notes within the edited line.
+5. If input starts with CHAPTER plus a numeral: it contains a CHAPTER TITLE merged with the first narrative sentence. Reconstruct readable title clauses, then separate the narrative with a period or em dash; do not put them on separate physical lines.
+6. Do not preserve broken constructions merely because they occur in the input. Prefer clear grammar over exact original wording.
+7. If input is already fluent, repeat it unchanged.
+
+Examples:
+Input: 'Sir you have made the grand touryou are a polite gentlemana very pretty gentleman I wish you joy.'
+Output: 'Sir, you have made the grand tour. You are a polite gentleman, a very pretty gentleman. I wish you joy.'
+Input: 'The troubles were such as to excite mirth than compassion.'
+Output: 'The troubles were more likely to excite mirth than compassion.'
+Input: 'My father his youngest son fell in love with her.'
+Output: 'My father, his youngest son, fell in love with her.'
+Input: 'He arrived late.He went home.'
+Output: 'He arrived late. He went home.'
+
+Return ONLY JSON: {"corrected":"one complete edited line","needs_review":false,"reason":"short note"}.
+Set needs_review=true only if content is too corrupt to reconstruct confidently. No other keys are needed.
+"""
+
+# A deliberately conservative *automatic* acceptance policy within balanced editing:
+# substantial edits stay in review.csv with original safely retained.
+PROTECTED_NUMBER = re.compile(r'(?<!\w)\d+(?:[.,]\d+)*(?!\w)')
+PROTECTED_CAPITAL = re.compile(r'(?<![.!?]\s)(?<!\w)[A-Z][a-z]{2,}\b')
 
 
 def sha256(raw):
@@ -88,32 +101,58 @@ def unpack_json(text):
 
 
 def classify(original, proposed, wants_review, max_char_change):
-    if '\n' in proposed or '\r' in proposed or '\x00' in proposed:
+    if any(ch in proposed for ch in ('\n', '\r', '\x00')):
         return original, 'review', 'newline_or_control'
     if proposed == original:
         return original, 'unchanged', 'no_change'
+    if not proposed.strip():
+        return original, 'review', 'blank_output'
     if wants_review:
         return original, 'review', 'model_uncertain'
     similarity = SequenceMatcher(None, original, proposed, autojunk=False).ratio()
     if 1 - similarity > max_char_change:
         return original, 'review', 'large_edit'
-    # Ignoring punctuation and whitespace, the letters and digits must be identical.
-    # Protects names, omissions, rewording, numeral replacement, etc.
-    compact = lambda s: ''.join(c.casefold() for c in s if c.isalnum())
-    if compact(original) != compact(proposed):
-        return original, 'review', 'lexical_change'
-    # Auto-accept ONLY whitespace differences. All punctuation modifications,
-    # even punctuation-only changes, need human review; punctuation carries meaning.
-    no_space = lambda value: ''.join(c for c in value if not c.isspace())
-    if no_space(original) != no_space(proposed):
-        return original, 'review', 'punctuation_change'
-    return proposed, 'accepted', 'whitespace_only'
+    if PROTECTED_NUMBER.findall(original) != PROTECTED_NUMBER.findall(proposed):
+        return original, 'review', 'numbers_changed'
+    # Capitalized proper nouns are hard to identify without NLP. This heuristic is
+    # deliberately sensitive and sends potentially risky edits to manual review.
+    old_caps = PROTECTED_CAPITAL.findall(original)
+    new_caps = PROTECTED_CAPITAL.findall(proposed)
+    missing_caps = [word for word in old_caps if word not in new_caps]
+    if missing_caps:
+        return original, 'review', 'capitalized_words_changed'
+    # Never silently change explicit negation or polarity expressions.
+    polarity = re.compile(r"\b(?:not|no|never|nor|without|cannot|can't|won't|don't|isn't|wasn't)\b", re.I)
+    if polarity.findall(original.lower()) != polarity.findall(proposed.lower()):
+        return original, 'review', 'negation_changed'
+    # Whitespace-only corrections are safe even when tokenization changes
+    # because a previously joined word becomes two tokens.
+    if ''.join(original.split()) == ''.join(proposed.split()):
+        return proposed, 'accepted', 'whitespace_only'
+    old_tokens = re.findall(r"[A-Za-z]+", original.lower())
+    new_tokens = re.findall(r"[A-Za-z]+", proposed.lower())
+    lexical_overlap = SequenceMatcher(None, old_tokens, new_tokens, autojunk=False).ratio()
+    if lexical_overlap < 0.88:
+        return original, 'review', 'lexical_change_high'
+    # A small set of high-precision quality alarms: these should not silently enter the training corpus.
+    if re.search(r"\bsuch as to [^.!?]{0,85}\bthan\b", proposed, re.I):
+        return original, 'review', 'broken_comparison'
+    if proposed.count('"') % 2:
+        return original, 'review', 'unbalanced_quotes'
+    if re.search(r"\*[^*]+\*|__[A-Za-z]|\[[^\]]+\]\([^)]*\)", proposed):
+        return original, 'review', 'markdown_markup'
+    if re.match(r'^\s*CHAPTER\s+[IVXLCDM0-9]+\b', original, re.I) and (not re.match(r'^\s*CHAPTER\s+[IVXLCDM0-9]+\b', proposed, re.I)):
+        return original, 'review', 'chapter_marker_missing'
+    # Quality warnings are heuristic, not linguistic proof.
+    # Balanced mode permits modest punctuation, grammar and rephrasing changes.
+    # Warning: this is *not* a semantic equivalence proof; approved lines need QA.
+    return proposed, 'accepted', 'balanced_small_edit'
 
 
 def chat(endpoint, model, previous, target, following, timeout, max_tokens, retries):
     payload = {
         'model': model,
-        'temperature': 0,
+        'temperature': 0.1,
         'max_tokens': max_tokens,
         'stream': False,
         'cache_prompt': True,
@@ -182,7 +221,8 @@ def main():
     parser.add_argument('--max-tokens', type=int, default=1500)
     parser.add_argument('--timeout', type=int, default=180)
     parser.add_argument('--retries', type=int, default=2)
-    parser.add_argument('--max-char-change', type=float, default=0.20)
+    parser.add_argument('--max-char-change', type=float, default=0.25)
+    parser.add_argument('--template-tag', default='default', help='Label checkpoint by server chat template, e.g. single or gguf')
     parser.add_argument('--sleep', type=float, default=0.0)
     parser.add_argument('--mock', action='store_true', help='Offline pipeline test, does NOT call Gemma')
     args = parser.parse_args()
@@ -203,14 +243,14 @@ def main():
         parser.error('No .txt files found')
 
     print(f'Books: {len(files)} | Model: {args.model} | Mock: {args.mock}')
-    print('INPUTS ARE READ-ONLY. Risky proposals are logged, NOT silently applied.')
+    print('INPUTS ARE READ-ONLY. Small balanced edits are applied; high-risk edits are reviewed.')
     for file in files:
         raw, bom, lines = read_book(file)
         fingerprint = sha256(raw)
         # Isolate checkpoints by source hash, prompt version, model, run mode and settings.
         settings = {'source_sha256': fingerprint, 'model': args.model, 'prompt': PROMPT_VERSION,
                     'max_lines': args.max_lines, 'max_tokens': args.max_tokens,
-                    'max_char_change': args.max_char_change, 'mock': args.mock}
+                    'max_char_change': args.max_char_change, 'mock': args.mock, 'temperature': 0.1, 'template_tag': args.template_tag}
         run_id = sha256(json.dumps(settings, sort_keys=True).encode())[:16]
         run_dir = state_dir / file.stem / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
