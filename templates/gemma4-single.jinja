@@ -1,0 +1,29 @@
+{%- if tools is defined and tools -%}
+    {%- for tool in tools -%}
+        {%- if tool is mapping -%}
+            {{- raise_exception('This template does not support tools.') -}}
+        {%- endif -%}
+    {%- endfor -%}
+{%- endif -%}
+{%- set ns = namespace(user_message=none) -%}
+{%- for message in messages -%}
+    {%- if message['role'] == 'user' -%}
+        {%- set ns.user_message = message -%}
+    {%- endif -%}
+{%- endfor -%}
+{{- bos_token -}}
+{%- if messages and messages[0]['role'] in ['system', 'developer'] -%}
+    {%- if messages[0]['content'] is not string -%}
+        {{- raise_exception('The system instruction must contain text.') -}}
+    {%- endif -%}
+    {{- '<|turn>system\n' + (messages[0]['content'] | trim) + '<turn|>\n' -}}
+{%- endif -%}
+{%- if ns.user_message is not none -%}
+    {%- if ns.user_message['content'] is not string -%}
+        {{- raise_exception('The user message must contain text.') -}}
+    {%- endif -%}
+    {{- '<|turn>user\n' + (ns.user_message['content'] | trim) + '<turn|>\n' -}}
+{%- endif -%}
+{%- if add_generation_prompt -%}
+    {{- '<|turn>model\n' -}}
+{%- endif -%}
