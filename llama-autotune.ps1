@@ -1,4 +1,4 @@
-﻿# llama.cpp local server autotuner - Windows PowerShell 5.1 / PowerShell 7+
+# llama.cpp local server autotuner - Windows PowerShell 5.1 / PowerShell 7+
 # Run from C:\llama.cpp (or place script beside the bin and models folders).
 # Runs until the configured time budget is reached, or all configurations have
 # been tested with enough repetitions. Does not modify model files or launchers.
@@ -30,18 +30,8 @@ $summaryCsv = Join-Path $runDir 'config-summary.csv'
 $bestCsv = Join-Path $runDir 'best-per-model.csv'
 $runLog = Join-Path $runDir 'run.log'
 
-$names = @(
-    'google_gemma-4-E2B-it-Q4_K_M.gguf',
-    'Qwen3.5-4B-Q4_K_M.gguf',
-    'Qwen3-4B-Q4_K_M.gguf'
-)
-$models = @()
-foreach ($name in $names) {
-    $found = @(Get-ChildItem -LiteralPath $modelDir -Filter $name -File -Recurse | Select-Object -First 1)
-    if ($found.Count) { $models += $found[0] }
-    else { Write-Warning "Model not found, skipping: $name" }
-}
-if ($models.Count -eq 0) { throw 'None of the specified models were found.' }
+$models = @(Get-ChildItem -LiteralPath $modelDir -Filter '*.gguf' -File -Recurse | Sort-Object FullName)
+if (-not $models.Count) { throw 'No GGUF models found.' }
 
 # Fixed, realistic short tasks. More than one language and answer type prevents
 # optimizing for a single toy prompt. Each response has a token limit.

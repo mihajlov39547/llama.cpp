@@ -1,11 +1,7 @@
 # Local OpenCode + llama.cpp launcher - fixed model contexts (PowerShell 5.1 and 7+)
-# Save to C:\llama.cpp\start-opencode-local.ps1
-# Run from PowerShell: .\start-opencode-local.ps1
-# Fixed contexts: Gemma 4 = 49152 (48K); Qwen3.5 = 32768 (32K); Qwen3 = 16384 (16K).
-# To change a context manually, edit the Context= value inside $profiles below.
-# The same value is used for llama-server -c and OpenCode model limit.context.
-# GPU/threads/batch/KV settings are carried over from the original single-API launcher.
-# Does not modify other llama-server/llama-cli launch settings.
+# Save to C:\llama.cpp\start-opencode.ps1
+# Run from PowerShell: .\start-opencode.ps1
+# Profiles and token budgets are maintained in model-profiles.ps1.
 [CmdletBinding()]
 param(
     [string]$ProjectDir = '',
@@ -25,24 +21,9 @@ if (-not (Test-Path -LiteralPath $serverExe -PathType Leaf)) { throw "Cannot fin
 if (-not (Test-Path -LiteralPath $modelDir -PathType Container)) { throw "Cannot find model directory: $modelDir" }
 if ($Port -lt 1024 -or $Port -gt 65535) { throw 'Port must be 1024..65535' }
 
-# Fixed context per model. Edit Context here if you wish to override manually.
-$profiles = @(
-    [pscustomobject]@{
-        Key='gemma'; File='google_gemma-4-E2B-it-Q4_K_M.gguf'; Label='Gemma 4 E2B Q4_K_M';
-        Alias='gemma-4-local'; Gpu='auto'; Threads=4; Batch=512; UBatch=128; KV='f16';
-        Context=49152; Output=4096; Reserved=12000   # 48K; OpenCode tested
-    },
-    [pscustomobject]@{
-        Key='qwen35'; File='Qwen3.5-4B-Q4_K_M.gguf'; Label='Qwen3.5 4B Q4_K_M';
-        Alias='qwen35-4b-local'; Gpu='all'; Threads=6; Batch=512; UBatch=256; KV='f16';
-        Context=32768; Output=4096; Reserved=8192    # 32K; OpenCode tools tested; reduce reservation from 12K
-    },
-    [pscustomobject]@{
-        Key='qwen3'; File='Qwen3-4B-Q4_K_M.gguf'; Label='Qwen3 4B Q4_K_M';
-        Alias='qwen3-4b-local'; Gpu='all'; Threads=6; Batch=512; UBatch=256; KV='q8_0';
-        Context=16384; Output=4096; Reserved=4096    # 16K; reduces Q8 KV allocation vs 32K
-    }
-)
+. (Join-Path $root 'model-profiles.ps1')
+$profiles = @(Get-LocalModelProfiles -ModelDirectory $modelDir)
+if (-not $profiles.Count) { throw "No GGUF models in $modelDir" }
 
 function Show-ModelMenu {
     param([object[]]$Items)
@@ -63,7 +44,7 @@ function Show-ModelMenu {
                 Write-Host ''
                 for ($i = 0; $i -lt $Items.Count; $i++) {
                     $item = $Items[$i]
-                    $path = Join-Path $modelDir $item.File
+                    $path = $item.File
                     $status = if (Test-Path -LiteralPath $path -PathType Leaf) { '' } else { ' [MODEL MISSING]' }
                     $prefix = if ($i -eq $selection) { ' > ' } else { '   ' }
                     $line = ('{0}{1}. {2} | {3}K context ({4} tokens){5}' -f $prefix, ($i + 1), $item.Label, [int]($item.Context / 1024), $item.Context, $status)
@@ -79,7 +60,7 @@ function Show-ModelMenu {
                     'Escape' { return -1 }
                     default {
                         if ($key.KeyChar -eq 'q' -or $key.KeyChar -eq 'Q') { return -1 }
-                        if ($key.KeyChar -match '^[1-3]$') { return ([int]::Parse([string]$key.KeyChar) - 1) }
+                        if ($key.KeyChar -match '^[1-9]$' -and [int]::Parse([string]$key.KeyChar) -le $Items.Count) { return ([int]::Parse([string]$key.KeyChar) - 1) }
                     }
                 }
             }
@@ -92,17 +73,17 @@ function Show-ModelMenu {
         Write-Host (' {0}. {1} | {2}K context' -f ($i + 1), $Items[$i].Label, [int]($Items[$i].Context / 1024))
     }
     while ($true) {
-        $answer = (Read-Host 'Choose 1-3 [Enter=1, Q=quit]').Trim()
+        $answer = (Read-Host "Choose 1-$($Items.Count) [Enter=1, Q=quit]").Trim()
         if ($answer -eq '') { return 0 }
         if ($answer -match '^[qQ]$') { return -1 }
-        if ($answer -match '^[1-3]$') { return ([int]$answer - 1) }
+        if ($answer -match '^[1-9][0-9]*$' -and [int]$answer -le $Items.Count) { return ([int]$answer - 1) }
     }
 }
 
 $index = Show-ModelMenu -Items $profiles
 if ($index -lt 0) { return }
 $p = $profiles[$index]
-$modelPath = Join-Path $modelDir $p.File
+$modelPath = $p.File
 if (-not (Test-Path -LiteralPath $modelPath -PathType Leaf)) { throw "Missing model: $modelPath" }
 $context = [int]$p.Context
 $outputLimit = [int]$p.Output
@@ -137,6 +118,7 @@ $serverArgs = @(
     '--parallel', '1',
     '-t', [string]$p.Threads,
     '-c', [string]$context,
+    '-n', [string]$outputLimit,
     '-b', [string]$p.Batch,
     '-ub', [string]$p.UBatch,
     '--cache-type-k', $p.KV,
@@ -145,13 +127,13 @@ $serverArgs = @(
     '--reasoning-budget', '0'
 )
 Write-Host "`nModel: $($p.File)" -ForegroundColor Green
-Write-Host "Context: $context | GPU: $($p.Gpu) | CPU threads: $($p.Threads) | KV: $($p.KV) | output limit: $outputLimit" 
+Write-Host "Context: $context | GPU: $($p.Gpu) | CPU threads: $($p.Threads) | KV: $($p.KV) | output limit: $outputLimit"
 Write-Host "API: $serverUrl/v1 | Project: $project"
-if ($p.Key -ne 'gemma') { Write-Warning 'Qwen with larger OpenCode context may exceed 4 GiB VRAM even with the original GPU profile.' }
-Write-Host 'Opening llama-server in its own console window...' -ForegroundColor Cyan
+if ($p.Label -match 'Qwen') { Write-Warning 'Qwen with larger OpenCode context may exceed 4 GiB VRAM even with the original GPU profile.' }
+Write-Host 'Starting llama-server; logs: opencode-server.stdout.log / opencode-server.stderr.log' -ForegroundColor Cyan
 
-# Model/server output stays visible in a separate window.
-$proc = Start-Process -FilePath $serverExe -ArgumentList $serverArgs -WorkingDirectory $root -PassThru
+# Capture background server output in local log files.
+$proc = Start-Process -FilePath $serverExe -ArgumentList $serverArgs -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput (Join-Path $root 'opencode-server.stdout.log') -RedirectStandardError (Join-Path $root 'opencode-server.stderr.log') -PassThru
 Write-Host 'Checking /health (up to 180 seconds)...'
 $healthy = $false
 for ($attempt = 0; $attempt -lt 180; $attempt++) {
@@ -163,7 +145,7 @@ for ($attempt = 0; $attempt -lt 180; $attempt++) {
     $proc.Refresh()
     if ($proc.HasExited) { break }
 }
-if (-not $healthy) { throw "llama-server did not become healthy. Inspect its console window; the OpenCode config was not changed." }
+if (-not $healthy) { throw "llama-server did not become healthy. Inspect opencode-server.stderr.log; the OpenCode config was not changed." }
 
 # Check the model alias published by the server, not just /health.
 $api = Invoke-RestMethod -Uri "$serverUrl/v1/models" -TimeoutSec 10
@@ -211,7 +193,7 @@ $saved = @{ modelKey = $p.Key; context = $context } | ConvertTo-Json
 
 Write-Host "`nServer ready. OpenCode model: local-llama/$($p.Alias)" -ForegroundColor Green
 Write-Host "Config: $configPath" -ForegroundColor Green
-Write-Host 'Tool permissions: edit=ask; bash=ask'
+Write-Host 'Tool permissions: edit=allow; bash=allow'
 Write-Host 'Jinja: on (GGUF chat template); prompt caching: default enabled'
 Write-Host "Compaction: auto/prune; reserved=$reserved"
 if ($ServerOnly) {
@@ -226,6 +208,6 @@ if (-not $openCode) {
     return
 }
 Write-Host "`nLaunching OpenCode in the current console. Exit OpenCode to return to PowerShell." -ForegroundColor Cyan
-Write-Host 'The llama-server window remains open until you close it.' -ForegroundColor DarkGray
+Write-Host 'The llama-server process remains running after OpenCode exits.' -ForegroundColor DarkGray
 Push-Location -LiteralPath $project
 try { & opencode } finally { Pop-Location }

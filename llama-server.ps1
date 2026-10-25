@@ -1,23 +1,22 @@
-﻿# llama.cpp server launcher - Windows PowerShell 5.1 / PowerShell 7+
+# llama.cpp server launcher - Windows PowerShell 5.1 / PowerShell 7+
 # Save as C:\llama.cpp\llama-server.ps1
 $ErrorActionPreference = 'Stop'
 
 $root = $PSScriptRoot
+. (Join-Path $root 'model-profiles.ps1')
 $exe = Join-Path $root 'bin\llama-server.exe'
 $modelDir = Join-Path $root 'models'
 $settingsFile = Join-Path $root 'llama-server-settings.json'
 $cliSettingsFile = Join-Path $root 'llama-cli-settings.json'
 $hostAddress = '127.0.0.1' # Use 0.0.0.0 only when you intend to allow LAN access
 $port = 8080
-$contextSize = 4096
-$batchSize = 512
-$microBatchSize = 128
 $serverUrl = "http://127.0.0.1:$port"
 
 if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw "Missing server: $exe" }
 if (-not (Test-Path -LiteralPath $modelDir -PathType Container)) { throw "Missing models directory: $modelDir" }
 
-$models = @(Get-ChildItem -LiteralPath $modelDir -Filter '*.gguf' -File -Recurse | Sort-Object FullName)
+$profiles = @(Get-LocalModelProfiles -ModelDirectory $modelDir)
+$models = @($profiles | ForEach-Object { Get-Item -LiteralPath $_.File })
 if ($models.Count -eq 0) { throw "No .gguf models in $modelDir" }
 
 # Restore the last selected model (fall back to CLI settings on first run).
@@ -75,7 +74,8 @@ while ($true) {
 $listener = $null
 try {
     $listener = New-Object System.Net.Sockets.TcpClient
-    $connected = $listener.ConnectAsync('127.0.0.1', $port).Wait(600)
+    $connected = $false
+    try { $connected = $listener.ConnectAsync('127.0.0.1', $port).Wait(600) } catch { }
     if ($connected -and $listener.Connected) {
         throw "Port $port is already in use. Stop the existing server or change `$port in this script."
     }
@@ -84,49 +84,26 @@ try {
 }
 
 $selectedModel = $models[$selectedIndex]
-# Benchmark-validated profiles for the GTX 1650 Ti (4 GiB), October 2026.
-# TranslateGemma uses initial, unbenchmarked settings for the same GPU.
-# Exact filename matching ensures other models retain the original safe defaults.
-$gpuLayers = 'auto'
-$cpuThreads = $null
-$microBatchSize = 128
-$cacheTypeK = $null
-$cacheTypeV = $null
-$disableReasoning = ($selectedModel.Name -match 'Qwen3')
-$profileName = 'Default (untested model)'
-$chatTemplateArguments = @()
-switch -Regex ($selectedModel.Name) {
-    '^translategemma-4b-it-Q4_K_M\.gguf$' {
-        $gpuLayers = 'all'; $cpuThreads = 4; $contextSize = 4096
-        $batchSize = 512; $microBatchSize = 128
-        $cacheTypeK = 'f16'; $cacheTypeV = 'f16'
-        $disableReasoning = $false
-        $chatTemplateArguments = @('--no-jinja', '--chat-template', 'gemma')
-        $profileName = 'TranslateGemma 4B Q4_K_M (translation, unbenchmarked)'
-        break
-    }
-    '^google_gemma-4-E2B-it-Q4_K_M\.gguf$' {
-        $gpuLayers = 'auto'; $cpuThreads = 4; $microBatchSize = 128
-        $cacheTypeK = 'f16'; $cacheTypeV = 'f16'
-        $disableReasoning = $true
-        $profileName = 'Gemma 4 E2B benchmark profile'
-        break
-    }
-    '^Qwen3\.5-4B-Q4_K_M\.gguf$' {
-        $gpuLayers = 'all'; $cpuThreads = 6; $microBatchSize = 256
-        $cacheTypeK = 'f16'; $cacheTypeV = 'f16'
-        $disableReasoning = $true
-        $profileName = 'Qwen3.5 4B benchmark profile'
-        break
-    }
-    '^Qwen3-4B-Q4_K_M\.gguf$' {
-        $gpuLayers = 'all'; $cpuThreads = 6; $microBatchSize = 256
-        $cacheTypeK = 'q8_0'; $cacheTypeV = 'q8_0'
-        $disableReasoning = $true
-        $profileName = 'Qwen3 4B balanced VRAM profile'
-        break
-    }
+# Shared Gemma-4 defaults; existing Qwen profiles retain their tuned settings.
+$p = $profiles[$selectedIndex]
+$gpuLayers = $p.Gpu
+$cpuThreads = $p.Threads
+$contextSize = $p.Context
+$outputLimit = $p.Output
+$batchSize = $p.Batch
+$microBatchSize = $p.UBatch
+$cacheTypeK = $p.KV
+$cacheTypeV = $p.KV
+$disableReasoning = $true
+$profileName = $p.Label
+$chatTemplateArguments = @('--jinja')
+if ($p.SingleTemplate) {
+    $templatePath = Join-Path $root 'templates\gemma4-single.jinja'
+    if (-not (Test-Path -LiteralPath $templatePath -PathType Leaf)) { throw "Missing template: $templatePath" }
+    $chatTemplateArguments += @('--chat-template-file', ('"' + $templatePath + '"'))
 }
+Write-Host "Response allowance: $outputLimit | Input budget (including template): $($contextSize - $p.Reserved)"
+Write-Host 'API clients must leave the response allowance free in the context.'
 
 @{ lastModel = $selectedModel.FullName } | ConvertTo-Json | Set-Content -LiteralPath $settingsFile -Encoding UTF8
 
@@ -135,15 +112,18 @@ Write-Host "`nStarting server with: $($selectedModel.Name)" -ForegroundColor Gre
 Write-Host "Mode: $modeLabel | URL: $serverUrl | Context: $contextSize | batch: $batchSize | microbatch: $microBatchSize | GPU layers: $gpuLayers | threads: $(if ($null -eq $cpuThreads) { 'default' } else { $cpuThreads }) | KV: $(if ($cacheTypeK) { $cacheTypeK } else { 'default' })"
 Write-Host "Profile: $profileName" -ForegroundColor Yellow
 Write-Host "Chat template: $(if ($chatTemplateArguments.Count) { $chatTemplateArguments -join ' ' } else { 'default (model metadata)' })"
-Write-Host 'The server opens in a separate console window.'
+Write-Host 'Server logs: llama-server.stdout.log / llama-server.stderr.log'
 
 # Start executable directly; no cmd.exe quoting problems.
 $arguments = @(
     '-m', ('"' + $selectedModel.FullName + '"'),
+    '--alias', $p.Alias,
+    '--parallel', '1',
     '--host', $hostAddress,
     '--port', "$port",
     '--gpu-layers', $gpuLayers,
     '--fit', 'on',
+    '-n', [string]$outputLimit,
     '-c', "$contextSize",
     '-b', "$batchSize",
     '-ub', "$microBatchSize"
@@ -155,21 +135,22 @@ $arguments += $chatTemplateArguments
 if ($apiOnly) { $arguments += '--no-webui' }
 
 Write-Host ('Command: & "{0}" {1}' -f $exe, ($arguments -join ' '))
-$process = Start-Process -FilePath $exe -ArgumentList $arguments -WorkingDirectory (Join-Path $root 'bin') -PassThru
+$process = Start-Process -FilePath $exe -ArgumentList $arguments -WorkingDirectory (Join-Path $root 'bin') -WindowStyle Hidden -RedirectStandardOutput (Join-Path $root 'llama-server.stdout.log') -RedirectStandardError (Join-Path $root 'llama-server.stderr.log') -PassThru
 
-Write-Host 'Waiting for the server to become ready (up to 120 seconds)...'
+Write-Host 'Waiting for the server to become ready (up to 180 seconds)...'
 $ready = $false
-for ($attempt = 0; $attempt -lt 120; $attempt++) {
+for ($attempt = 0; $attempt -lt 180; $attempt++) {
     Start-Sleep -Seconds 1
     try {
         $response = Invoke-WebRequest -Uri "$serverUrl/health" -UseBasicParsing -TimeoutSec 2
         if ($response.StatusCode -eq 200) { $ready = $true; break }
     } catch { }
+    $process.Refresh()
     if ($process.HasExited) { break }
 }
 
 if (-not $ready) {
-    Write-Warning "Server not confirmed ready. Check the server console. Address: $serverUrl"
+    Write-Warning "Server not confirmed ready. Check llama-server.stderr.log. Address: $serverUrl"
     exit 1
 }
 

@@ -1,4 +1,4 @@
-﻿# Focused follow-up benchmark for llama.cpp build b8729, Windows PowerShell 5.1+.
+# Focused follow-up benchmark for llama.cpp build b8729, Windows PowerShell 5.1+.
 # Does NOT modify the existing CLI/server launchers or models.
 param(
     [int]$Minutes = 45,
@@ -139,11 +139,16 @@ $prompts = @(
     @{id='rewrite';text='Rewrite the following rough research note as a clear technical explanation in approximately 220 to 300 English words. Then provide a 4-item checklist. Note: GPU kernel-only timing excludes transfers; end-to-end timing includes transfers, host orchestration, and synchronization; compare matched input sizes, warm up first, use medians, and check correctness before any timing.'}
 )
 $models = @()
-foreach ($spec in $specs) {
-    $file = @(Get-ChildItem -LiteralPath $modelDir -File -Recurse -Filter $spec.name | Select-Object -First 1)
-    if (!$file.Count) { throw "Model missing: $($spec.name)" }
-    $models += [pscustomobject]@{file=$file[0]; key=$spec.key; variants=$spec.variants}
+foreach ($file in (Get-ChildItem -LiteralPath $modelDir -Filter '*.gguf' -File -Recurse | Sort-Object FullName)) {
+    $spec = $specs | Where-Object { $_.name -eq $file.Name } | Select-Object -First 1
+    if (-not $spec) {
+        $spec = @{ key=($file.BaseName -replace '[^a-zA-Z0-9-]', '_'); variants=@(
+            @{id='baseline';layers='auto';ub=128;threads=4;k='f16';v='f16'}
+        ) }
+    }
+    $models += [pscustomobject]@{file=$file; key=$spec.key; variants=$spec.variants}
 }
+if (-not $models.Count) { throw 'No GGUF models found.' }
 
 function StartServer($model, $cfg, [string]$tag) {
     $out = Join-Path $runDir "server-$tag.out.log"

@@ -16,7 +16,7 @@
                                                                               "name":  "Gemma 4 E2B Q4_K_M",
                                                                               "limit":  {
                                                                                             "context":  49152,
-                                                                                            "output":  4096
+                                                                                            "output":  12288
                                                                                         }
                                                                           }
                                                     }
@@ -25,7 +25,7 @@
     "compaction":  {
                        "auto":  true,
                        "prune":  true,
-                       "reserved":  12000
+                       "reserved":  12288
                    },
     "permission":  {
                        "edit":  "allow",

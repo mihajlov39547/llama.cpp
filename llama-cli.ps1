@@ -1,14 +1,12 @@
-﻿# llama.cpp CLI launcher - PowerShell 5.1 / 7+
+# llama.cpp CLI launcher - PowerShell 5.1 / 7+
 # Save as C:\llama.cpp\llama-cli.ps1
 $ErrorActionPreference = 'Stop'
 
 $root = $PSScriptRoot
+. (Join-Path $root 'model-profiles.ps1')
 $exe = Join-Path $root 'bin\llama-cli.exe'
 $modelDir = Join-Path $root 'models'
 $settingsFile = Join-Path $root 'llama-cli-settings.json'
-$contextSize = 4096
-$batchSize = 512
-$microBatchSize = 128
 
 if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) {
     throw "Executable not found: $exe"
@@ -17,8 +15,8 @@ if (-not (Test-Path -LiteralPath $modelDir -PathType Container)) {
     throw "Models folder not found: $modelDir"
 }
 
-$models = @(Get-ChildItem -LiteralPath $modelDir -Filter '*.gguf' -File -Recurse |
-    Sort-Object FullName)
+$profiles = @(Get-LocalModelProfiles -ModelDirectory $modelDir)
+$models = @($profiles | ForEach-Object { Get-Item -LiteralPath $_.File })
 if ($models.Count -eq 0) {
     throw "No GGUF models found in $modelDir"
 }
@@ -73,53 +71,32 @@ $selectedModel = $models[$selectedIndex]
     ConvertTo-Json |
     Set-Content -LiteralPath $settingsFile -Encoding UTF8
 
-# Benchmark-validated profiles for the GTX 1650 Ti (4 GiB), October 2026.
-# TranslateGemma is a separate, unbenchmarked translation profile.
-# Exact filename matching ensures other models retain the original safe defaults.
-$gpuLayers = 'auto'
-$cpuThreads = $null
-$microBatchSize = 128
-$cacheTypeK = $null
-$cacheTypeV = $null
-$disableReasoning = ($selectedModel.Name -match 'Qwen3')
-$profileName = 'Default (untested model)'
-$chatTemplateArguments = @()
-switch -Regex ($selectedModel.Name) {
-    '^translategemma-4b-it-Q4_K_M\.gguf$' {
-        $gpuLayers = 'all'; $cpuThreads = 4; $contextSize = 2048
-        $batchSize = 512; $microBatchSize = 128
-        $cacheTypeK = 'f16'; $cacheTypeV = 'f16'
-        $disableReasoning = $false
-        $chatTemplateArguments = @('--no-jinja', '--chat-template', 'gemma')
-        $profileName = 'TranslateGemma 4B Q4_K_M (translation, unbenchmarked)'
-        break
-    }
-    '^google_gemma-4-E2B-it-Q4_K_M\.gguf$' {
-        $gpuLayers = 'auto'; $cpuThreads = 4; $microBatchSize = 128
-        $cacheTypeK = 'f16'; $cacheTypeV = 'f16'
-        $disableReasoning = $true
-        $profileName = 'Gemma 4 E2B benchmark profile'
-        break
-    }
-    '^Qwen3\.5-4B-Q4_K_M\.gguf$' {
-        $gpuLayers = 'all'; $cpuThreads = 6; $microBatchSize = 256
-        $cacheTypeK = 'f16'; $cacheTypeV = 'f16'
-        $disableReasoning = $true
-        $profileName = 'Qwen3.5 4B benchmark profile'
-        break
-    }
-    '^Qwen3-4B-Q4_K_M\.gguf$' {
-        $gpuLayers = 'all'; $cpuThreads = 6; $microBatchSize = 256
-        $cacheTypeK = 'q8_0'; $cacheTypeV = 'q8_0'
-        $disableReasoning = $true
-        $profileName = 'Qwen3 4B balanced VRAM profile'
-        break
-    }
+# Shared Gemma-4 defaults; existing Qwen profiles retain their tuned settings.
+$p = $profiles[$selectedIndex]
+$gpuLayers = $p.Gpu
+$cpuThreads = $p.Threads
+$contextSize = $p.Context
+$outputLimit = $p.Output
+$batchSize = $p.Batch
+$microBatchSize = $p.UBatch
+$cacheTypeK = $p.KV
+$cacheTypeV = $p.KV
+$disableReasoning = $true
+$profileName = $p.Label
+$chatTemplateArguments = @('--jinja')
+if ($p.SingleTemplate) {
+    $templatePath = Join-Path $root 'templates\gemma4-single.jinja'
+    if (-not (Test-Path -LiteralPath $templatePath -PathType Leaf)) { throw "Missing template: $templatePath" }
+    $chatTemplateArguments += @('--chat-template-file', $templatePath)
 }
+Write-Host "Response allowance: $outputLimit | Input budget (including template): $($contextSize - $p.Reserved)"
+Write-Host 'Keep prompts within the input budget to leave the full response allowance.'
+
 $arguments = @(
     '-m', $selectedModel.FullName,
     '--gpu-layers', $gpuLayers,
     '--fit', 'on',
+    '-n', [string]$outputLimit,
     '-c', [string]$contextSize,
     '-b', [string]$batchSize,
     '-ub', [string]$microBatchSize
