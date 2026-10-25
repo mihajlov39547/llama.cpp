@@ -2,6 +2,8 @@
 
 Improve your prompts with local AI.
 
+Every improved prompt is written in English: non-English and mixed-language drafts are translated while being improved, and English drafts are polished as usual. For example, `Sta cemo sledece?` becomes `What shall we do next?`. Refine Further also keeps the result in English. Code, paths, URLs, identifiers, and exact literal text are preserved; a request for an answer in another language remains a constraint in the English prompt.
+
 Version 0.2.0 adds a toolbar popup with model status, Settings and a packaged cross-platform Setup Guide. Opening the popup checks `/v1/models` only; it never captures a ChatGPT draft. Pin the extension in Chrome's toolbar to access it.
 
 Vanilla JavaScript Manifest V3 extension for `https://chatgpt.com/`. Improve a draft with a local llama.cpp model, review the suggestion, then Apply, Copy, Refine Further, or Cancel. Apply never submits a message.
