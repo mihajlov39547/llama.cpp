@@ -1,6 +1,6 @@
 # Local model launchers
 
-Run `./llama-server.ps1` for the API or Web UI, `./llama-cli.ps1` for a
+Run `./start-llama-server.ps1` for the API or Web UI, `./start-llama-cli.ps1` for a
 terminal conversation, or `./start-opencode.ps1` for OpenCode.
 
 `model-profiles.ps1` supplies the launcher profiles. All launchers and both
@@ -41,3 +41,11 @@ Servers run in the background, with stdout/stderr written to
 `opencode-server.stdout.log` / `opencode-server.stderr.log`. Logs are overwritten
 on the next launch. Stop the existing server before relaunching on the same port.
 The default address remains `http://127.0.0.1:8080/v1`.
+
+Use Up/Down to highlight a model and Enter to select it. Esc or Q cancels.
+The server mode menu uses the same controls. Hosts without console keyboard
+support use numbered input instead. All three launchers share `launcher-menu.ps1`.
+
+Benchmark entry points are `./start-llama-autotune.ps1` and
+`./start-llama-validate-best.ps1`. Settings filenames stay unchanged so saved
+model selections are preserved.

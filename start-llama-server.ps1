@@ -1,9 +1,10 @@
 # llama.cpp server launcher - Windows PowerShell 5.1 / PowerShell 7+
-# Save as C:\llama.cpp\llama-server.ps1
+# Save as C:\llama.cpp\start-llama-server.ps1
 $ErrorActionPreference = 'Stop'
 
 $root = $PSScriptRoot
 . (Join-Path $root 'model-profiles.ps1')
+. (Join-Path $root 'launcher-menu.ps1')
 $exe = Join-Path $root 'bin\llama-server.exe'
 $modelDir = Join-Path $root 'models'
 $settingsFile = Join-Path $root 'llama-server-settings.json'
@@ -38,37 +39,12 @@ for ($i = 0; $i -lt $models.Count; $i++) {
     }
 }
 
-Write-Host "`nllama.cpp - SERVER model launcher" -ForegroundColor Cyan
-Write-Host '----------------------------------'
-for ($i = 0; $i -lt $models.Count; $i++) {
-    $size = '{0:N2}' -f ($models[$i].Length / 1GB)
-    $mark = if ($i -eq $defaultIndex) { ' [default]' } else { '' }
-    Write-Host ('{0,2}. {1} ({2} GiB){3}' -f ($i + 1), $models[$i].Name, $size, $mark)
-}
-Write-Host ' Q. Quit'
+$selectedIndex = Show-ModelMenu -Items $profiles -DefaultIndex $defaultIndex -Title 'llama.cpp - SERVER model launcher'
+if ($selectedIndex -lt 0) { return }
 
-while ($true) {
-    $answer = (Read-Host "Select model [Enter = $($defaultIndex + 1)]").Trim()
-    if ($answer -match '^[qQ]$') { exit 0 }
-    if ($answer -eq '') { $selectedIndex = $defaultIndex; break }
-    $number = 0
-    if ([int]::TryParse($answer, [ref]$number) -and $number -ge 1 -and $number -le $models.Count) {
-        $selectedIndex = $number - 1
-        break
-    }
-    Write-Host 'Invalid selection. Try again.' -ForegroundColor Yellow
-}
-
-Write-Host "`nServer mode:" -ForegroundColor Cyan
-Write-Host ' 1. API only (no Web UI) [default]'
-Write-Host ' 2. Web UI + API (open browser)'
-while ($true) {
-    $modeAnswer = (Read-Host 'Select mode [Enter = 1]').Trim()
-    if ($modeAnswer -eq '' -or $modeAnswer -eq '1') { $apiOnly = $true; break }
-    if ($modeAnswer -eq '2') { $apiOnly = $false; break }
-    if ($modeAnswer -match '^[qQ]$') { exit 0 }
-    Write-Host 'Invalid selection. Enter 1, 2, or Q.' -ForegroundColor Yellow
-}
+$modeIndex = Show-LauncherMenu -Title 'Server mode' -Items @('API only (no Web UI)', 'Web UI + API (open browser)')
+if ($modeIndex -lt 0) { return }
+$apiOnly = ($modeIndex -eq 0)
 
 # Avoid starting a second server on an occupied port.
 $listener = $null

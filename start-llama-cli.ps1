@@ -1,9 +1,10 @@
 # llama.cpp CLI launcher - PowerShell 5.1 / 7+
-# Save as C:\llama.cpp\llama-cli.ps1
+# Save as C:\llama.cpp\start-llama-cli.ps1
 $ErrorActionPreference = 'Stop'
 
 $root = $PSScriptRoot
 . (Join-Path $root 'model-profiles.ps1')
+. (Join-Path $root 'launcher-menu.ps1')
 $exe = Join-Path $root 'bin\llama-cli.exe'
 $modelDir = Join-Path $root 'models'
 $settingsFile = Join-Path $root 'llama-cli-settings.json'
@@ -40,31 +41,8 @@ for ($i = 0; $i -lt $models.Count; $i++) {
     }
 }
 
-Write-Host ''
-Write-Host 'llama.cpp - CLI model launcher' -ForegroundColor Cyan
-Write-Host '--------------------------------'
-for ($i = 0; $i -lt $models.Count; $i++) {
-    $size = '{0:N2}' -f ($models[$i].Length / 1GB)
-    $marker = if ($i -eq $defaultIndex) { ' [default]' } else { '' }
-    Write-Host ('{0,2}. {1} ({2} GiB){3}' -f ($i + 1), $models[$i].Name, $size, $marker)
-}
-Write-Host ' Q. Quit'
-
-while ($true) {
-    $answer = (Read-Host "Select model [Enter = $($defaultIndex + 1)]").Trim()
-    if ($answer -match '^[qQ]$') { exit 0 }
-    if ($answer -eq '') {
-        $selectedIndex = $defaultIndex
-        break
-    }
-    $number = 0
-    if ([int]::TryParse($answer, [ref]$number) -and
-        $number -ge 1 -and $number -le $models.Count) {
-        $selectedIndex = $number - 1
-        break
-    }
-    Write-Host 'Invalid selection. Try again.' -ForegroundColor Yellow
-}
+$selectedIndex = Show-ModelMenu -Items $profiles -DefaultIndex $defaultIndex -Title 'llama.cpp - CLI model launcher'
+if ($selectedIndex -lt 0) { return }
 
 $selectedModel = $models[$selectedIndex]
 @{ lastModel = $selectedModel.FullName } |

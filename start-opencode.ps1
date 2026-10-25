@@ -25,62 +25,9 @@ if ($Port -lt 1024 -or $Port -gt 65535) { throw 'Port must be 1024..65535' }
 $profiles = @(Get-LocalModelProfiles -ModelDirectory $modelDir)
 if (-not $profiles.Count) { throw "No GGUF models in $modelDir" }
 
-function Show-ModelMenu {
-    param([object[]]$Items)
-    $selection = 0  # Always start on Gemma; no remembered last selection.
-    $interactive = $false
-    try {
-        $interactive = (-not [Console]::IsInputRedirected) -and (-not [Console]::IsOutputRedirected)
-    } catch { $interactive = $false }
+. (Join-Path $root 'launcher-menu.ps1')
 
-    if ($interactive) {
-        try {
-            [Console]::CursorVisible = $false
-            while ($true) {
-                [Console]::Clear()
-                Write-Host 'OpenCode + llama.cpp launcher' -ForegroundColor Cyan
-                Write-Host 'Use Up/Down arrows, then Enter. Esc or Q to quit.'
-                Write-Host 'Default selection: Gemma 4 E2B - 48K context' -ForegroundColor DarkGray
-                Write-Host ''
-                for ($i = 0; $i -lt $Items.Count; $i++) {
-                    $item = $Items[$i]
-                    $path = $item.File
-                    $status = if (Test-Path -LiteralPath $path -PathType Leaf) { '' } else { ' [MODEL MISSING]' }
-                    $prefix = if ($i -eq $selection) { ' > ' } else { '   ' }
-                    $line = ('{0}{1}. {2} | {3}K context ({4} tokens){5}' -f $prefix, ($i + 1), $item.Label, [int]($item.Context / 1024), $item.Context, $status)
-                    if ($i -eq $selection) {
-                        Write-Host $line -ForegroundColor Black -BackgroundColor Cyan
-                    } else { Write-Host $line }
-                }
-                $key = [Console]::ReadKey($true)
-                switch ($key.Key) {
-                    'UpArrow' { $selection = ($selection + $Items.Count - 1) % $Items.Count }
-                    'DownArrow' { $selection = ($selection + 1) % $Items.Count }
-                    'Enter' { return $selection }
-                    'Escape' { return -1 }
-                    default {
-                        if ($key.KeyChar -eq 'q' -or $key.KeyChar -eq 'Q') { return -1 }
-                        if ($key.KeyChar -match '^[1-9]$' -and [int]::Parse([string]$key.KeyChar) -le $Items.Count) { return ([int]::Parse([string]$key.KeyChar) - 1) }
-                    }
-                }
-            }
-        } finally { try { [Console]::CursorVisible = $true } catch {} }
-    }
-
-    # Fallback for hosts which don't support Console.ReadKey / interactive arrows.
-    Write-Host "`nOpenCode + llama.cpp launcher" -ForegroundColor Cyan
-    for ($i = 0; $i -lt $Items.Count; $i++) {
-        Write-Host (' {0}. {1} | {2}K context' -f ($i + 1), $Items[$i].Label, [int]($Items[$i].Context / 1024))
-    }
-    while ($true) {
-        $answer = (Read-Host "Choose 1-$($Items.Count) [Enter=1, Q=quit]").Trim()
-        if ($answer -eq '') { return 0 }
-        if ($answer -match '^[qQ]$') { return -1 }
-        if ($answer -match '^[1-9][0-9]*$' -and [int]$answer -le $Items.Count) { return ([int]$answer - 1) }
-    }
-}
-
-$index = Show-ModelMenu -Items $profiles
+$index = Show-ModelMenu -Items $profiles -Title 'OpenCode + llama.cpp launcher'
 if ($index -lt 0) { return }
 $p = $profiles[$index]
 $modelPath = $p.File
