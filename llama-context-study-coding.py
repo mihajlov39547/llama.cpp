@@ -27,7 +27,8 @@ try:
 except urllib.error.HTTPError:sys.exit(f'Port {args.port} already serves HTTP. Choose another port.')
 except urllib.error.URLError:pass
 run=root/'benchmark-results'/('context-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S'));run.mkdir(parents=True)
-log_file=run/'study.log';csv_file=run/'measurements.csv';summary_file=run/'summary.csv';deadline=time.monotonic()+args.minutes*60
+log_run=root/'logs'/'benchmark-results'/run.name;log_run.mkdir(parents=True,exist_ok=True)
+log_file=log_run/'study.log';csv_file=run/'measurements.csv';summary_file=run/'summary.csv';deadline=time.monotonic()+args.minutes*60
 fields=['timestamp','context_requested','context_effective','target_tokens','actual_prompt_tokens','input_fill_ratio','task','position','round','startup_s','http_ok','answer_correct','finish_reason','ttfe_s','ttfc_s','total_s','prefill_tps','decode_tps','prompt_tokens_reported','completion_tokens_reported','gpu_before_mib','gpu_peak_mib','gpu_temp_peak_c','error','answer']
 with csv_file.open('w',newline='',encoding='utf-8-sig') as f:csv.DictWriter(f,fieldnames=fields).writeheader()
 
@@ -165,7 +166,7 @@ log(f'Study output: {run} | contexts={contexts} | minutes={args.minutes}')
 for ctx in contexts:
  if time.monotonic()>deadline:break
  proc=None;start=time.perf_counter();startup=None
- out=(run/f'server-{ctx}.stdout.log').open('w',encoding='utf-8');err=(run/f'server-{ctx}.stderr.log').open('w',encoding='utf-8')
+ out=(log_run/f'server-{ctx}.stdout.log').open('w',encoding='utf-8');err=(log_run/f'server-{ctx}.stderr.log').open('w',encoding='utf-8')
  command=[str(executable),'-m',str(model),'--host','127.0.0.1','--port',str(args.port),'--no-webui','--gpu-layers','auto','--fit','on','--parallel','1','-t','4','-c',str(ctx),'-b','512','-ub','128','--cache-type-k','f16','--cache-type-v','f16','--reasoning','off','--reasoning-budget','0']
  try:
   current_mem,current_temp=gpu()
@@ -183,7 +184,7 @@ for ctx in contexts:
    time.sleep(2)
   startup=round(time.perf_counter()-start,3)
   if not ready:
-   log(f'FAILED start context={ctx}; examine server-{ctx}.stderr.log');continue
+   log(f'FAILED start context={ctx}; examine {log_run}/server-{ctx}.stderr.log');continue
   props=call('/props');effective=props.get('default_generation_settings',{}).get('n_ctx')
   models=call('/v1/models');model_id=models['data'][0]['id']
   log(f'Ready ctx={ctx}, actual={effective}, startup={startup}s, gpu={gpu()}')

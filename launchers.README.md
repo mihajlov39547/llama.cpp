@@ -37,8 +37,8 @@ template for conversation history and tool calls. Other model families use their
 embedded templates in all launchers.
 
 Servers run in the background, with stdout/stderr written to
-`llama-server.stdout.log` / `llama-server.stderr.log` or
-`opencode-server.stdout.log` / `opencode-server.stderr.log`. Logs are overwritten
+`logs/llama-server.stdout.log` / `logs/llama-server.stderr.log` or
+`logs/opencode-server.stdout.log` / `logs/opencode-server.stderr.log`. Logs are overwritten
 on the next launch. Stop the existing server before relaunching on the same port.
 The default address remains `http://127.0.0.1:8080/v1`.
 
@@ -49,3 +49,47 @@ support use numbered input instead. All three launchers share `launcher-menu.ps1
 Benchmark entry points are `./start-llama-autotune.ps1` and
 `./start-llama-validate-best.ps1`. Settings filenames stay unchanged so saved
 model selections are preserved.
+
+All launcher-managed engine logs are rooted at `logs/`, created automatically and
+excluded from Git. CLI engine diagnostics use timestamped `llama-cli-*.log`
+files through native `--log-file`, preserving interactive console input/output.
+These are diagnostic logs, not complete conversation transcripts. OpenCode's
+`--print-logs` stderr goes to timestamped `opencode-client-*.log`; its internal
+application/session storage remains managed by OpenCode. Codex uses `logs/codex`
+via its per-launch `log_dir` setting (see
+[official documentation](https://learn.chatgpt.com/docs/config-file/config-basic#log-directory)).
+Benchmark and Python study logs use `logs/benchmark-results/<run>/`; CSVs and
+response artifacts remain in `benchmark-results/<run>/`. Existing benchmark
+history is preserved. Already-running processes keep their original log handles;
+restart through the updated launcher to use the new paths.
+
+Run `./start-llama-status.ps1` to inspect or manage the server on port 8080.
+Up/Down and Enter select Leave, Refresh, Stop, or Restart. Esc/Q leaves it running.
+The status stays visible above the menu. Alternate ports use `-Port 8081`.
+Noninteractive commands are also available:
+
+```powershell
+.\start-llama-status.ps1 -Action Status
+.\start-llama-status.ps1 -Action Stop
+.\start-llama-status.ps1 -Action Restart
+```
+
+Status combines `/health`, `/v1/models`, `/props`, `/slots`, `/metrics`, Windows
+process statistics, and recent timing lines from the server log. Missing metrics
+are shown as unavailable; slot token counts are for the current/last task, not
+lifetime totals. Metrics include prompt/generated token totals, processing time,
+throughput and active/queued requests when supported by the installed server.
+The server APIs are described in the
+[upstream documentation](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md).
+
+Both server launchers now enable `--metrics --slots` and record the process/log
+association under `logs/server-<port>.json`. If their port is occupied, they open
+the manager before showing model selection. After stopping the old server, rerun
+the launcher to choose another model.
+
+Stop interrupts active requests and terminates only the verified local listener
+running this workspace's `bin/llama-server.exe`. Restart reuses its native command
+line, enables monitoring, writes timestamped logs, and waits for health. It does
+not start another OpenCode client. Counters and prompt caches reset on restart.
+Opening status or choosing Leave never stops the server. Old servers without a
+log record show any recent candidate log explicitly as unverified.

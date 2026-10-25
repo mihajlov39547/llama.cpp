@@ -21,7 +21,8 @@ root=pathlib.Path(a.root);exe=root/'bin'/'llama-server.exe';model=root/'models'/
 if not exe.is_file() or not model.is_file():sys.exit(f'Missing {exe} or {model}')
 if a.context<4096 or a.prompt_tokens<1000 or a.prompt_tokens>a.context-a.max_output-512:sys.exit('Invalid context / prompt target: reserve output and chat-template room.')
 run=root/'benchmark-results'/('opencode-readiness-'+dt.datetime.now().strftime('%Y%m%d-%H%M%S'));run.mkdir(parents=True,exist_ok=True)
-results=run/'requests.csv';events=run/'study.log';deadline=time.monotonic()+a.minutes*60
+log_run=root/'logs'/'benchmark-results'/run.name;log_run.mkdir(parents=True,exist_ok=True)
+results=run/'requests.csv';events=log_run/'study.log';deadline=time.monotonic()+a.minutes*60
 cols='timestamp,mode,scenario,round,request_tokens_est,prompt_tokens_reported,completion_tokens_reported,cached_tokens_reported,ttfe_s,ttfc_s,total_s,prefill_tps,decode_tps,finish_reason,correct,tool_calls,server_gpu_mib,server_gpu_temp_c,answer,error'.split(',')
 with results.open('w',newline='',encoding='utf-8-sig') as f:csv.DictWriter(f,fieldnames=cols).writeheader()
 
@@ -110,8 +111,8 @@ def filler(target):
  return s,count_tokens(s)
 
 def start_server(cache):
- outf=(run/f'server-cache-{int(cache)}.stdout.log').open('w',encoding='utf-8')
- errf=(run/f'server-cache-{int(cache)}.stderr.log').open('w',encoding='utf-8')
+ outf=(log_run/f'server-cache-{int(cache)}.stdout.log').open('w',encoding='utf-8')
+ errf=(log_run/f'server-cache-{int(cache)}.stderr.log').open('w',encoding='utf-8')
  cmd=[str(exe),'-m',str(model),'--host','127.0.0.1','--port',str(a.port),'--no-webui','--gpu-layers','auto','--fit','on','--parallel','1','-t','4','-c',str(a.context),'-b','512','-ub','128','--cache-type-k','f16','--cache-type-v','f16','--reasoning','off','--reasoning-budget','0']
  proc=subprocess.Popen(cmd,cwd=str(exe.parent),stdout=outf,stderr=errf,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
  try:

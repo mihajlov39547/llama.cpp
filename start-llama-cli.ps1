@@ -3,6 +3,8 @@
 $ErrorActionPreference = 'Stop'
 
 $root = $PSScriptRoot
+$logDir = Join-Path $root 'logs'
+[void][IO.Directory]::CreateDirectory($logDir)
 . (Join-Path $root 'model-profiles.ps1')
 . (Join-Path $root 'launcher-menu.ps1')
 $exe = Join-Path $root 'bin\llama-cli.exe'
@@ -70,7 +72,10 @@ if ($p.SingleTemplate) {
 Write-Host "Response allowance: $outputLimit | Input budget (including template): $($contextSize - $p.Reserved)"
 Write-Host 'Keep prompts within the input budget to leave the full response allowance.'
 
+$cliLog = Join-Path $logDir ('llama-cli-' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff') + '-' + $PID + '.log')
+Write-Host "Engine log: $cliLog"
 $arguments = @(
+    '--log-file', $cliLog,
     '-m', $selectedModel.FullName,
     '--gpu-layers', $gpuLayers,
     '--fit', 'on',

@@ -3,7 +3,8 @@ function Show-LauncherMenu {
     param(
         [Parameter(Mandatory=$true)][string[]]$Items,
         [string]$Title = 'Select model',
-        [int]$DefaultIndex = 0
+        [int]$DefaultIndex = 0,
+        [string[]]$Header = @()
     )
     if (-not $Items.Count) { throw 'The menu has no items.' }
     if ($DefaultIndex -lt 0 -or $DefaultIndex -ge $Items.Count) { throw 'Invalid default menu selection.' }
@@ -21,6 +22,7 @@ function Show-LauncherMenu {
             while ($true) {
                 [Console]::Clear()
                 Write-Host $Title -ForegroundColor Cyan
+                foreach ($line in $Header) { Write-Host $line }
                 Write-Host 'Up/Down: move | Enter: select | Esc/Q: quit'
                 for ($i = 0; $i -lt $Items.Count; $i++) {
                     $prefix = if ($i -eq $selection) { ' > ' } else { '   ' }
@@ -53,6 +55,7 @@ function Show-LauncherMenu {
     }
 
     Write-Host "`n$Title" -ForegroundColor Cyan
+    foreach ($line in $Header) { Write-Host $line }
     for ($i = 0; $i -lt $Items.Count; $i++) {
         Write-Host (' {0}. {1}' -f ($i + 1), $Items[$i])
     }

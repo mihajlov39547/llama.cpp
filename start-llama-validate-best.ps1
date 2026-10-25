@@ -13,6 +13,8 @@ $root = $PSScriptRoot
 $exe = Join-Path $root 'bin\llama-server.exe'
 $modelDir = Join-Path $root 'models'
 $runDir = Join-Path $root ('benchmark-results\validation-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+$logRunDir = Join-Path (Join-Path $root 'logs\benchmark-results') (Split-Path -Leaf $runDir)
+[void][IO.Directory]::CreateDirectory($logRunDir)
 $endpoint = "http://127.0.0.1:$Port"
 $deadline = (Get-Date).AddMinutes($Minutes)
 $proc = $null
@@ -24,8 +26,8 @@ if ($Minutes -lt 1 -or $Rounds -lt 1 -or $Port -lt 1 -or $Port -gt 65535) { thro
 # PowerShell 5.1 treats native stderr as a terminating error when ErrorActionPreference=Stop.
 # llama-server prints CUDA initialization messages to stderr even for --help.
 # Capture stdout and stderr in separate temporary files to avoid NativeCommandError.
-$helpStdout = Join-Path ([IO.Path]::GetTempPath()) ("llama-help-{0}.out.txt" -f [guid]::NewGuid().ToString('N'))
-$helpStderr = Join-Path ([IO.Path]::GetTempPath()) ("llama-help-{0}.err.txt" -f [guid]::NewGuid().ToString('N'))
+$helpStdout = Join-Path $logRunDir ("llama-help-{0}.out.txt" -f [guid]::NewGuid().ToString('N'))
+$helpStderr = Join-Path $logRunDir ("llama-help-{0}.err.txt" -f [guid]::NewGuid().ToString('N'))
 try {
     $helpProc = Start-Process -FilePath $exe -ArgumentList '--help' -WorkingDirectory (Join-Path $root 'bin') -NoNewWindow -Wait -PassThru -RedirectStandardOutput $helpStdout -RedirectStandardError $helpStderr
     $helpOutput = ((Get-Content -LiteralPath $helpStdout -Raw -ErrorAction SilentlyContinue) + "`n" + (Get-Content -LiteralPath $helpStderr -Raw -ErrorAction SilentlyContinue))
@@ -45,7 +47,7 @@ New-Item -ItemType Directory -Path $runDir -Force | Out-Null
 $rowsPath = Join-Path $runDir 'requests.csv'
 $summaryPath = Join-Path $runDir 'summary.csv'
 $rankingPath = Join-Path $runDir 'best-per-model.csv'
-$logPath = Join-Path $runDir 'run.log'
+$logPath = Join-Path $logRunDir 'run.log'
 $responsesDir = Join-Path $runDir 'responses'
 New-Item -ItemType Directory -Path $responsesDir | Out-Null
 function Log([string]$msg) {
@@ -151,8 +153,8 @@ foreach ($file in (Get-ChildItem -LiteralPath $modelDir -Filter '*.gguf' -File -
 if (-not $models.Count) { throw 'No GGUF models found.' }
 
 function StartServer($model, $cfg, [string]$tag) {
-    $out = Join-Path $runDir "server-$tag.out.log"
-    $err = Join-Path $runDir "server-$tag.err.log"
+    $out = Join-Path $logRunDir "server-$tag.out.log"
+    $err = Join-Path $logRunDir "server-$tag.err.log"
     $args = @(
         '-m',('"'+$model.file.FullName+'"'), '--host','127.0.0.1','--port',[string]$Port,
         '--no-webui','--gpu-layers',[string]$cfg.layers,'--fit','on','--parallel','1',

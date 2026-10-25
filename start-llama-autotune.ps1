@@ -15,6 +15,8 @@ $root = $PSScriptRoot
 $exe = Join-Path $root 'bin\llama-server.exe'
 $modelDir = Join-Path $root 'models'
 $runDir = Join-Path $root ('benchmark-results\run-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+$logRunDir = Join-Path (Join-Path $root 'logs\benchmark-results') (Split-Path -Leaf $runDir)
+[void][IO.Directory]::CreateDirectory($logRunDir)
 $apiBase = "http://127.0.0.1:$Port"
 $startTime = Get-Date
 $deadline = $startTime.AddMinutes($Minutes)
@@ -28,7 +30,7 @@ New-Item -ItemType Directory -Path $runDir -Force | Out-Null
 $rawCsv = Join-Path $runDir 'requests.csv'
 $summaryCsv = Join-Path $runDir 'config-summary.csv'
 $bestCsv = Join-Path $runDir 'best-per-model.csv'
-$runLog = Join-Path $runDir 'run.log'
+$runLog = Join-Path $logRunDir 'run.log'
 
 $models = @(Get-ChildItem -LiteralPath $modelDir -Filter '*.gguf' -File -Recurse | Sort-Object FullName)
 if (-not $models.Count) { throw 'No GGUF models found.' }
@@ -93,8 +95,8 @@ function Wait-Ready {
 }
 function Start-BenchServer {
     param($model, $cfg, [string]$tag)
-    $stdout = Join-Path $script:runDir ("server-$tag.out.log")
-    $stderr = Join-Path $script:runDir ("server-$tag.err.log")
+    $stdout = Join-Path $script:logRunDir ("server-$tag.out.log")
+    $stderr = Join-Path $script:logRunDir ("server-$tag.err.log")
     $args = @(
         '-m', ('"' + $model.FullName + '"'),
         '--host', '127.0.0.1', '--port', [string]$script:Port,
@@ -233,7 +235,7 @@ try {
                 try {
                     $started = Start-BenchServer -model $model -cfg $cfg -tag $tag
                     if (!$started) {
-                        Add-Log "Failed to start server (see server-$tag.err.log)"
+                        Add-Log "Failed to start server (see $logRunDir\server-$tag.err.log)"
                         $failed = [pscustomobject]@{ timestamp=(Get-Date -Format 'o'); model=$model.Name; gpu_layers=[string]$cfg.GpuLayers; ubatch=$cfg.UBatch; threads=$cfg.Threads; phase='test'; round=$round; prompt_id='startup'; ok=$false; latency_s=''; prompt_tokens=''; completion_tokens=''; prompt_tps=''; generation_tps=''; gpu_temp_c=''; gpu_used_mib=''; error='Server did not become ready'; answer_excerpt='' }
                         $failed | Export-Csv -LiteralPath $rawCsv -Append -NoTypeInformation -Encoding UTF8
                         continue

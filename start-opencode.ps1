@@ -11,6 +11,8 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $root = $PSScriptRoot
+$logDir = Join-Path $root 'logs'
+[void][IO.Directory]::CreateDirectory($logDir)
 $serverExe = Join-Path $root 'bin\llama-server.exe'
 $modelDir = Join-Path $root 'models'
 $project = if ([string]::IsNullOrWhiteSpace($ProjectDir)) { Join-Path $root 'opencode' } else { $ProjectDir }
@@ -22,6 +24,21 @@ if (-not (Test-Path -LiteralPath $modelDir -PathType Container)) { throw "Cannot
 if ($Port -lt 1024 -or $Port -gt 65535) { throw 'Port must be 1024..65535' }
 
 . (Join-Path $root 'model-profiles.ps1')
+. (Join-Path $root 'server-control.ps1')
+# Fail rather than silently connecting OpenCode to a wrong/different server.
+$tcp = $null
+try {
+    $tcp = New-Object System.Net.Sockets.TcpClient
+    $connected = $false
+    try { $connected = $tcp.ConnectAsync('127.0.0.1', $Port).Wait(600) -and $tcp.Connected } catch { }
+    if ($connected) {
+        Write-Host "Port $Port is already in use. Opening server status and controls."
+        & (Join-Path $root 'start-llama-status.ps1') -Port $Port
+        return
+    }
+} finally { if ($tcp) { $tcp.Dispose() } }
+
+
 $profiles = @(Get-LocalModelProfiles -ModelDirectory $modelDir)
 if (-not $profiles.Count) { throw "No GGUF models in $modelDir" }
 
@@ -42,20 +59,11 @@ if (-not (Test-Path -LiteralPath $project -PathType Container)) {
 }
 $configPath = Join-Path $project 'opencode.json'
 
-# Fail rather than silently connecting OpenCode to a wrong/different server.
-$tcp = $null
-try {
-    $tcp = New-Object System.Net.Sockets.TcpClient
-    $connected = $false
-    try { $connected = $tcp.ConnectAsync('127.0.0.1', $Port).Wait(600) -and $tcp.Connected } catch { }
-    if ($connected) {
-        throw "Port $Port is already in use. Stop the old llama-server.exe first, then rerun this launcher."
-    }
-} finally { if ($tcp) { $tcp.Dispose() } }
-
 $serverArgs = @(
     '-m', ('"' + $modelPath + '"'),
     '--alias', $p.Alias,
+    '--metrics',
+    '--slots',
     '--host', '127.0.0.1',
     '--port', [string]$Port,
     '--no-webui',
@@ -77,10 +85,11 @@ Write-Host "`nModel: $($p.File)" -ForegroundColor Green
 Write-Host "Context: $context | GPU: $($p.Gpu) | CPU threads: $($p.Threads) | KV: $($p.KV) | output limit: $outputLimit"
 Write-Host "API: $serverUrl/v1 | Project: $project"
 if ($p.Label -match 'Qwen') { Write-Warning 'Qwen with larger OpenCode context may exceed 4 GiB VRAM even with the original GPU profile.' }
-Write-Host 'Starting llama-server; logs: opencode-server.stdout.log / opencode-server.stderr.log' -ForegroundColor Cyan
+Write-Host 'Starting llama-server; logs: logs\opencode-server.stdout.log / logs\opencode-server.stderr.log' -ForegroundColor Cyan
 
 # Capture background server output in local log files.
-$proc = Start-Process -FilePath $serverExe -ArgumentList $serverArgs -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput (Join-Path $root 'opencode-server.stdout.log') -RedirectStandardError (Join-Path $root 'opencode-server.stderr.log') -PassThru
+$proc = Start-Process -FilePath $serverExe -ArgumentList $serverArgs -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput (Join-Path $logDir 'opencode-server.stdout.log') -RedirectStandardError (Join-Path $logDir 'opencode-server.stderr.log') -PassThru
+Save-ServerLogRecord $proc $Port (Join-Path $logDir 'opencode-server.stdout.log') (Join-Path $logDir 'opencode-server.stderr.log')
 Write-Host 'Checking /health (up to 180 seconds)...'
 $healthy = $false
 for ($attempt = 0; $attempt -lt 180; $attempt++) {
@@ -92,7 +101,7 @@ for ($attempt = 0; $attempt -lt 180; $attempt++) {
     $proc.Refresh()
     if ($proc.HasExited) { break }
 }
-if (-not $healthy) { throw "llama-server did not become healthy. Inspect opencode-server.stderr.log; the OpenCode config was not changed." }
+if (-not $healthy) { throw "llama-server did not become healthy. Inspect logs\opencode-server.stderr.log; the OpenCode config was not changed." }
 
 # Check the model alias published by the server, not just /health.
 $api = Invoke-RestMethod -Uri "$serverUrl/v1/models" -TimeoutSec 10
@@ -157,4 +166,15 @@ if (-not $openCode) {
 Write-Host "`nLaunching OpenCode in the current console. Exit OpenCode to return to PowerShell." -ForegroundColor Cyan
 Write-Host 'The llama-server process remains running after OpenCode exits.' -ForegroundColor DarkGray
 Push-Location -LiteralPath $project
-try { & opencode } finally { Pop-Location }
+$clientLog = Join-Path $logDir ('opencode-client-' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff') + '-' + $PID + '.log')
+Write-Host "OpenCode stderr log: $clientLog"
+$savedErrorPreference = $ErrorActionPreference
+try {
+    # Preserve interactive stdin/stdout; only stderr is redirected.
+    # PowerShell 5.1 wraps native stderr as errors, so do not terminate on log lines.
+    $ErrorActionPreference = 'Continue'
+    & opencode --print-logs 2> $clientLog
+} finally {
+    $ErrorActionPreference = $savedErrorPreference
+    Pop-Location
+}

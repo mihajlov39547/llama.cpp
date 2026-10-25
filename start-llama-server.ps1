@@ -3,7 +3,10 @@
 $ErrorActionPreference = 'Stop'
 
 $root = $PSScriptRoot
+$logDir = Join-Path $root 'logs'
+[void][IO.Directory]::CreateDirectory($logDir)
 . (Join-Path $root 'model-profiles.ps1')
+. (Join-Path $root 'server-control.ps1')
 . (Join-Path $root 'launcher-menu.ps1')
 $exe = Join-Path $root 'bin\llama-server.exe'
 $modelDir = Join-Path $root 'models'
@@ -15,6 +18,22 @@ $serverUrl = "http://127.0.0.1:$port"
 
 if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw "Missing server: $exe" }
 if (-not (Test-Path -LiteralPath $modelDir -PathType Container)) { throw "Missing models directory: $modelDir" }
+
+# Avoid starting a second server on an occupied port.
+$listener = $null
+try {
+    $listener = New-Object System.Net.Sockets.TcpClient
+    $connected = $false
+    try { $connected = $listener.ConnectAsync('127.0.0.1', $port).Wait(600) } catch { }
+    if ($connected -and $listener.Connected) {
+        Write-Host "Port $port is already in use. Opening server status and controls."
+        & (Join-Path $root 'start-llama-status.ps1') -Port $port
+        return
+    }
+} finally {
+    if ($listener) { $listener.Dispose() }
+}
+
 
 $profiles = @(Get-LocalModelProfiles -ModelDirectory $modelDir)
 $models = @($profiles | ForEach-Object { Get-Item -LiteralPath $_.File })
@@ -46,19 +65,6 @@ $modeIndex = Show-LauncherMenu -Title 'Server mode' -Items @('API only (no Web U
 if ($modeIndex -lt 0) { return }
 $apiOnly = ($modeIndex -eq 0)
 
-# Avoid starting a second server on an occupied port.
-$listener = $null
-try {
-    $listener = New-Object System.Net.Sockets.TcpClient
-    $connected = $false
-    try { $connected = $listener.ConnectAsync('127.0.0.1', $port).Wait(600) } catch { }
-    if ($connected -and $listener.Connected) {
-        throw "Port $port is already in use. Stop the existing server or change `$port in this script."
-    }
-} finally {
-    if ($listener) { $listener.Dispose() }
-}
-
 $selectedModel = $models[$selectedIndex]
 # Shared Gemma-4 defaults; existing Qwen profiles retain their tuned settings.
 $p = $profiles[$selectedIndex]
@@ -88,12 +94,14 @@ Write-Host "`nStarting server with: $($selectedModel.Name)" -ForegroundColor Gre
 Write-Host "Mode: $modeLabel | URL: $serverUrl | Context: $contextSize | batch: $batchSize | microbatch: $microBatchSize | GPU layers: $gpuLayers | threads: $(if ($null -eq $cpuThreads) { 'default' } else { $cpuThreads }) | KV: $(if ($cacheTypeK) { $cacheTypeK } else { 'default' })"
 Write-Host "Profile: $profileName" -ForegroundColor Yellow
 Write-Host "Chat template: $(if ($chatTemplateArguments.Count) { $chatTemplateArguments -join ' ' } else { 'default (model metadata)' })"
-Write-Host 'Server logs: llama-server.stdout.log / llama-server.stderr.log'
+Write-Host 'Server logs: logs\llama-server.stdout.log / logs\llama-server.stderr.log'
 
 # Start executable directly; no cmd.exe quoting problems.
 $arguments = @(
     '-m', ('"' + $selectedModel.FullName + '"'),
     '--alias', $p.Alias,
+    '--metrics',
+    '--slots',
     '--parallel', '1',
     '--host', $hostAddress,
     '--port', "$port",
@@ -111,7 +119,8 @@ $arguments += $chatTemplateArguments
 if ($apiOnly) { $arguments += '--no-webui' }
 
 Write-Host ('Command: & "{0}" {1}' -f $exe, ($arguments -join ' '))
-$process = Start-Process -FilePath $exe -ArgumentList $arguments -WorkingDirectory (Join-Path $root 'bin') -WindowStyle Hidden -RedirectStandardOutput (Join-Path $root 'llama-server.stdout.log') -RedirectStandardError (Join-Path $root 'llama-server.stderr.log') -PassThru
+$process = Start-Process -FilePath $exe -ArgumentList $arguments -WorkingDirectory (Join-Path $root 'bin') -WindowStyle Hidden -RedirectStandardOutput (Join-Path $logDir 'llama-server.stdout.log') -RedirectStandardError (Join-Path $logDir 'llama-server.stderr.log') -PassThru
+Save-ServerLogRecord $process $port (Join-Path $logDir 'llama-server.stdout.log') (Join-Path $logDir 'llama-server.stderr.log')
 
 Write-Host 'Waiting for the server to become ready (up to 180 seconds)...'
 $ready = $false
@@ -126,11 +135,12 @@ for ($attempt = 0; $attempt -lt 180; $attempt++) {
 }
 
 if (-not $ready) {
-    Write-Warning "Server not confirmed ready. Check llama-server.stderr.log. Address: $serverUrl"
+    Write-Warning "Server not confirmed ready. Check logs\llama-server.stderr.log. Address: $serverUrl"
     exit 1
 }
 
 Write-Host "Server ready: $serverUrl" -ForegroundColor Green
+Write-Host "Manage server: .\start-llama-status.ps1"
 Write-Host "OpenAI-compatible API: $serverUrl/v1" -ForegroundColor Cyan
 if ($apiOnly) {
     Write-Host 'API-only mode: browser will not be opened.'
