@@ -61,7 +61,6 @@ $batchSize = $p.Batch
 $microBatchSize = $p.UBatch
 $cacheTypeK = $p.KV
 $cacheTypeV = $p.KV
-$disableReasoning = $true
 $profileName = $p.Label
 $chatTemplateArguments = @('--jinja')
 if ($p.SingleTemplate) {
@@ -70,6 +69,8 @@ if ($p.SingleTemplate) {
     $chatTemplateArguments += @('--chat-template-file', $templatePath)
 }
 Write-Host "Response allowance: $outputLimit | Input budget (including template): $($contextSize - $p.Reserved)"
+Write-Host ("Inference: " + ((Get-ModelInferenceArguments -Profile $p) -join ' '))
+if ($p.Reasoning -eq 'on') { Write-Host 'The response allowance includes thinking plus the final answer.' }
 Write-Host 'Keep prompts within the input budget to leave the full response allowance.'
 
 $cliLog = Join-Path $logDir ('llama-cli-' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff') + '-' + $PID + '.log')
@@ -86,8 +87,12 @@ $arguments = @(
 )
 if ($null -ne $cpuThreads) { $arguments += @('-t', [string]$cpuThreads) }
 if ($cacheTypeK) { $arguments += @('--cache-type-k', $cacheTypeK, '--cache-type-v', $cacheTypeV) }
-if ($disableReasoning) { $arguments += @('--reasoning', 'off', '--reasoning-budget', '0') }
+$arguments += @(Get-ModelInferenceArguments -Profile $p)
 $arguments += $chatTemplateArguments
+if ($p.SystemPromptFile) {
+    if (-not (Test-Path -LiteralPath $p.SystemPromptFile -PathType Leaf)) { throw "Missing system prompt: $($p.SystemPromptFile)" }
+    $arguments += @('--system-prompt-file', $p.SystemPromptFile)
+}
 
 Write-Host ''
 Write-Host "Profile: $profileName | GPU layers: $gpuLayers | threads: $(if ($null -eq $cpuThreads) { 'default' } else { $cpuThreads }) | KV: $(if ($cacheTypeK) { $cacheTypeK } else { 'default' })" -ForegroundColor Yellow

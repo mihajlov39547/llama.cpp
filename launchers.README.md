@@ -14,7 +14,7 @@ Current inventory:
 | --- | ---: | ---: | ---: |
 | google_gemma-4-E2B-it-Q4_K_M.gguf | 49152 | 12288 | 12288 |
 | gemma-4-E4B-it-UD-IQ2_M.gguf | 49152 | 12288 | 12288 |
-| qwen3.5-4B-super-coder.Q4_0.gguf | 49152 | 12288 | 12288 |
+| qwen3.5-4B-super-coder.Q4_0.gguf | 32768 | 12288 | 12288 |
 | Qwen3.5-4B-Q4_K_M.gguf | 32768 | 4096 | 8192 |
 | Qwen3-4B-Q4_K_M.gguf | 16384 | 4096 | 4096 |
 
@@ -22,7 +22,8 @@ The default baseline is automatic GPU layers, fit enabled, 4 CPU threads,
 512 batch, 128 microbatch, F16 K/V cache, Jinja enabled and reasoning disabled
 with a zero thinking budget. Servers use one slot so the context is not divided
 between concurrent slots. Existing Qwen profiles retain their previous tuning.
-E4B and Super Coder inherit the baseline; their performance has not been measured.
+E4B inherits the baseline. Super Coder has the model-specific settings below;
+its performance has not been measured locally.
 
 48K means 49152 tokens; 12K means 12288 tokens. `-n 12288` sets the server's
 generation allowance. It does not enforce an input reservation: API clients must
@@ -93,3 +94,37 @@ line, enables monitoring, writes timestamped logs, and waits for health. It does
 not start another OpenCode client. Counters and prompt caches reset on restart.
 Opening status or choosing Leave never stops the server. Old servers without a
 log record show any recent candidate log explicitly as unverified.
+
+Status also shows launch reasoning mode/budget, total output allowance, K/V cache
+types and offload, prompt-cache settings, Flash Attention, GPU layers, CPU threads,
+and batch sizes. These are the actual process arguments, not the current profile
+file, and are labeled separately from API defaults and current/last-task values.
+KV-cache tokens/usage are shown when the metrics endpoint exposes them; recent
+cache/attention log lines are labeled as potentially stale. Missing values remain
+unavailable or unspecified; zero/false are retained. A thinking budget of -1 means
+no separate thinking cap, while 0 requests immediate end of thinking.
+
+Super Coder Q4_0 uses a 32768-token context, temperature 0.6, top-p 0.95,
+top-k 20, min-p 0, Flash Attention on, and reasoning on with no separate thinking
+cap (`--reasoning-budget -1`). Its 12288-token output allowance includes thinking
+and the final answer; the input budget is 20480 tokens including system/template
+text. GPU layers remain auto with fit enabled, 4 threads, batch 512, microbatch
+128 and F16 KV cache. These hardware settings are a baseline, not new benchmarks.
+
+All three launchers use the embedded Qwen chat template for history and tools.
+The CLI loads `templates/super-coder-system.txt`. OpenCode adds that file as
+instructions and sets build/plan temperature/top-p explicitly; its existing agent
+instructions remain in effect. The standalone HTTP server has no system-prompt
+flag: clients should send a system message such as `You are a helpful coding
+assistant.` Requests can override server sampling defaults.
+
+To apply a changed profile, stop the old server with `start-llama-status.ps1`,
+then select Super Coder in the desired launcher. The status manager's Restart
+replays the previous command, so it does not pick up edited profile settings.
+
+Local validation: profile/argument/configuration tests pass, but the installed
+b8729 server cannot load the current Super Coder GGUF. It reports
+`missing tensor 'blk.32.ssm_conv1d.weight'`; the file advertises
+`qwen35.block_count = 33`. This occurs during model loading, before inference.
+See `logs/verification/super-coder.stderr.log`. A compatible model/runtime is
+needed before generation can be validated; the GGUF and binaries were not modified.

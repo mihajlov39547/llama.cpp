@@ -77,13 +77,14 @@ $serverArgs = @(
     '-b', [string]$p.Batch,
     '-ub', [string]$p.UBatch,
     '--cache-type-k', $p.KV,
-    '--cache-type-v', $p.KV,
-    '--reasoning', 'off',
-    '--reasoning-budget', '0'
+    '--cache-type-v', $p.KV
 )
+$serverArgs += @(Get-ModelInferenceArguments -Profile $p)
 Write-Host "`nModel: $($p.File)" -ForegroundColor Green
 Write-Host "Context: $context | GPU: $($p.Gpu) | CPU threads: $($p.Threads) | KV: $($p.KV) | output limit: $outputLimit"
 Write-Host "API: $serverUrl/v1 | Project: $project"
+Write-Host ("Inference: " + ((Get-ModelInferenceArguments -Profile $p) -join ' '))
+if ($p.Reasoning -eq 'on') { Write-Host 'The response allowance includes thinking plus the final answer.' }
 if ($p.Label -match 'Qwen') { Write-Warning 'Qwen with larger OpenCode context may exceed 4 GiB VRAM even with the original GPU profile.' }
 Write-Host 'Starting llama-server; logs: logs\opencode-server.stdout.log / logs\opencode-server.stderr.log' -ForegroundColor Cyan
 
@@ -128,6 +129,16 @@ $config = [ordered]@{
 $config.provider['local-llama'].models[$p.Alias] = [ordered]@{
     name = $p.Label
     limit = [ordered]@{ context = $context; output = [int]$outputLimit }
+}
+if ($p.SystemPromptFile) {
+    if (-not (Test-Path -LiteralPath $p.SystemPromptFile -PathType Leaf)) { throw "Missing coding instructions: $($p.SystemPromptFile)" }
+    # Add guidance without replacing OpenCode's built-in agent/tool instructions.
+    $config.instructions = @($p.SystemPromptFile)
+    $config.agent = [ordered]@{
+        build = [ordered]@{ temperature=$p.Temperature; top_p=$p.TopP }
+        plan = [ordered]@{ temperature=$p.Temperature; top_p=$p.TopP }
+    }
+    $config.provider['local-llama'].models[$p.Alias].reasoning = $true
 }
 $json = $config | ConvertTo-Json -Depth 15
 $updateConfig = $true

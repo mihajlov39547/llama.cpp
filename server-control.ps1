@@ -53,6 +53,85 @@ function Save-ServerLogRecord {
         ConvertTo-Json | Set-Content -LiteralPath (Join-Path $dir "server-$Port.json") -Encoding UTF8
 }
 
+function Get-ServerLaunchOptions {
+    param([string]$CommandLine)
+    $options = @{}
+    if ([string]::IsNullOrWhiteSpace($CommandLine)) { return $options }
+    # Use Windows argument parsing so quoted paths/JSON cannot masquerade as flags.
+    if (-not ('LlamaStatus.CommandLine' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+namespace LlamaStatus {
+    public static class CommandLine {
+        [DllImport("shell32.dll", SetLastError=true, CharSet=CharSet.Unicode)]
+        static extern IntPtr CommandLineToArgvW(string command, out int count);
+        [DllImport("kernel32.dll")] static extern IntPtr LocalFree(IntPtr memory);
+        public static string[] Split(string command) {
+            int count; IntPtr memory = CommandLineToArgvW(command, out count);
+            if (memory == IntPtr.Zero) throw new System.ComponentModel.Win32Exception();
+            try {
+                var result = new string[count];
+                for (int i=0; i<count; i++) result[i] = Marshal.PtrToStringUni(Marshal.ReadIntPtr(memory, i * IntPtr.Size));
+                return result;
+            } finally { LocalFree(memory); }
+        }
+    }
+}
+'@
+    }
+    $tokens = [LlamaStatus.CommandLine]::Split($CommandLine)
+    $aliases = @{
+        '-rea'='--reasoning'; '-fa'='--flash-attn'; '-ctk'='--cache-type-k'; '-ctv'='--cache-type-v'
+        '-n'='--n-predict'; '--predict'='--n-predict'; '-c'='--ctx-size'
+        '-b'='--batch-size'; '-ub'='--ubatch-size'; '-t'='--threads'
+        '-ngl'='--gpu-layers'; '--n-gpu-layers'='--gpu-layers'
+        '-kvo'='--kv-offload'; '-nkvo'='--no-kv-offload'
+    }
+    for ($i=1; $i -lt $tokens.Count; $i++) {
+        if ($tokens[$i] -notmatch '^(-{1,2}[a-zA-Z][\w-]*)(?:=(.*))?$') { continue }
+        $key=$matches[1]; $value=$true
+        if ($matches.ContainsKey(2)) { $value=$matches[2] }
+        elseif ($i+1 -lt $tokens.Count -and $tokens[$i+1] -notmatch '^--?[a-zA-Z]') { $value=$tokens[++$i] }
+        if ($aliases.ContainsKey($key)) { $key=$aliases[$key] }
+        switch ($key) {
+            '--no-cache-prompt' { $key='--cache-prompt'; $value='off' }
+            '--cache-prompt' { $value='on' }
+            '--no-kv-offload' { $key='--kv-offload'; $value='off' }
+            '--kv-offload' { $value='on' }
+        }
+        $options[$key]=$value
+    }
+    return $options
+}
+
+function Format-ServerValue {
+    param($Value, [string]$Missing='unavailable')
+    if ($null -eq $Value -or [string]$Value -eq '') { return $Missing }
+    if ($Value -is [bool]) { return ([string]$Value).ToLowerInvariant() }
+    if ($Value -is [array]) { return ($Value -join ', ') }
+    return [string]$Value
+}
+
+function Get-ServerInferenceLines {
+    param($Options, $Props)
+    $missing='not set (runtime/model default)'
+    $reasoning=Format-ServerValue $Options['--reasoning'] $missing
+    $budget=Format-ServerValue $Options['--reasoning-budget'] $missing
+    if ($budget -eq '-1') { $budget='-1 (no separate thinking cap)' }
+    elseif ($budget -eq '0') { $budget='0 (immediate end of thinking)' }
+    "Launch reasoning: $reasoning | Thinking budget: $budget"
+    "Launch output allowance: $(Format-ServerValue $Options['--n-predict'] $missing) tokens (thinking + answer; requests may override)"
+    "Launch KV cache: K=$(Format-ServerValue $Options['--cache-type-k'] $missing), V=$(Format-ServerValue $Options['--cache-type-v'] $missing) | Offload: $(Format-ServerValue $Options['--kv-offload'] $missing)"
+    "Launch prompt cache: $(Format-ServerValue $Options['--cache-prompt'] $missing) | Cache RAM MiB: $(Format-ServerValue $Options['--cache-ram'] $missing) | Reuse threshold: $(Format-ServerValue $Options['--cache-reuse'] $missing)"
+    "Launch compute: Flash Attention=$(Format-ServerValue $Options['--flash-attn'] $missing), GPU layers=$(Format-ServerValue $Options['--gpu-layers'] $missing), threads=$(Format-ServerValue $Options['--threads'] $missing), batch=$(Format-ServerValue $Options['--batch-size'] $missing), microbatch=$(Format-ServerValue $Options['--ubatch-size'] $missing)"
+    "Launch template: $(Format-ServerValue $Options['--chat-template-file'] 'embedded/default (unless otherwise overridden)')"
+    $params=$Props.default_generation_settings.params
+    "API reasoning defaults: format=$(Format-ServerValue $params.reasoning_format), in content=$(Format-ServerValue $params.reasoning_in_content), budget=$(Format-ServerValue $params.reasoning_budget)"
+    "API output defaults: n_predict=$(Format-ServerValue $params.n_predict), max_tokens=$(Format-ServerValue $params.max_tokens) (-1 means no explicit cap)"
+    "API template capabilities: tools=$(Format-ServerValue $Props.chat_template_caps.supports_tools), tool calls=$(Format-ServerValue $Props.chat_template_caps.supports_tool_calls), preserve reasoning=$(Format-ServerValue $Props.chat_template_caps.supports_preserve_reasoning)"
+}
+
 function Get-ServerStatusLines {
     param($Server, [int]$Port)
     "Address: http://127.0.0.1:$Port | Snapshot: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
@@ -72,11 +151,15 @@ function Get-ServerStatusLines {
     "Health: $(if ($health) { $health.status } else { 'unavailable/loading/unresponsive' })"
     $props = Read-ServerEndpoint $Port 'props'
     $models = Read-ServerEndpoint $Port 'v1/models'
+    try { $launch = Get-ServerLaunchOptions $Server.CommandLine }
+    catch { $launch=@{}; 'Launch argument parsing unavailable.' }
+    Get-ServerInferenceLines $launch $props
     if ($props) {
         "Model: $($props.model_alias) | File: $($props.model_path)"
         "Context per slot: $($props.default_generation_settings.n_ctx) | Slots: $($props.total_slots) | Web UI: $($props.webui) | Build: $($props.build_info)"
         $sampling = $props.default_generation_settings.params
         "Default sampling: temperature=$($sampling.temperature), top_k=$($sampling.top_k), top_p=$($sampling.top_p), min_p=$($sampling.min_p)"
+        "Default penalties: repeat=$(Format-ServerValue $sampling.repeat_penalty), presence=$(Format-ServerValue $sampling.presence_penalty), frequency=$(Format-ServerValue $sampling.frequency_penalty) | Samplers: $(Format-ServerValue $sampling.samplers)"
     }
     foreach ($model in $models.data) {
         "API model: $($model.id)"
@@ -89,11 +172,20 @@ function Get-ServerStatusLines {
     foreach ($slot in $slots) {
         if ($null -eq $slot.id) { continue }
         "Slot $($slot.id): $(if ($slot.is_processing) { 'BUSY' } else { 'idle' }) | Task: $($slot.id_task) | Context: $($slot.n_ctx)"
+        "  Current/last task: output limit=$(Format-ServerValue $slot.params.n_predict), reasoning format=$(Format-ServerValue $slot.params.reasoning_format), thinking budget=$(Format-ServerValue $slot.params.reasoning_budget), cache_prompt=$(Format-ServerValue $slot.params.cache_prompt)"
+        "  Reported cache/task tokens: cached=$(Format-ServerValue $slot.tokens_cached), past=$(Format-ServerValue $slot.n_past), prompt=$(Format-ServerValue $slot.n_prompt_tokens)"
         foreach ($token in $slot.next_token) {
             "  Current/last task decoded tokens: $($token.n_decoded) | Remaining: $($token.n_remain) (not lifetime totals)"
         }
     }
     $metrics = ConvertFrom-ServerMetrics (Read-ServerEndpoint $Port 'metrics' -Text)
+    $cacheTokens=$null; $cacheRatio=$null
+    foreach ($prefix in @('llamacpp:', 'llamacpp_')) {
+        if ($metrics.Contains($prefix+'kv_cache_tokens')) { $cacheTokens=$metrics[$prefix+'kv_cache_tokens'] }
+        if ($metrics.Contains($prefix+'kv_cache_usage_ratio')) { $cacheRatio=$metrics[$prefix+'kv_cache_usage_ratio'] }
+    }
+    $cachePercent=if ($null -ne $cacheRatio) { '{0:N1}%' -f ($cacheRatio * 100) } else { 'unavailable' }
+    "Live KV cache metrics: tokens=$(Format-ServerValue $cacheTokens) | Usage: $cachePercent (not exposed by every build)"
     if ($metrics.Count) {
         'Metrics since this server started (token totals may lag active requests):'
         foreach ($key in $metrics.Keys) { '  {0}: {1}' -f ($key -replace '^llamacpp[:_]',''), $metrics[$key] }
@@ -119,7 +211,10 @@ function Get-ServerStatusLines {
         if ($candidate) { $logPath=$candidate.FullName; "Possible legacy log (not process-verified): $logPath" }
     }
     if ($logPath -and (Test-Path -LiteralPath $logPath)) {
-        $timings = @(Get-Content -LiteralPath $logPath -Tail 1000 -ErrorAction SilentlyContinue |
+        $logTail = @(Get-Content -LiteralPath $logPath -Tail 1000 -ErrorAction SilentlyContinue)
+        $cacheLines = @($logTail | Where-Object { $_ -match 'cache state:|KV buffer size|KV self size|flash_attn\s*=' } | Select-Object -Last 3)
+        if ($cacheLines.Count) { 'Recent cache/attention observations in that log (may be stale):'; $cacheLines }
+        $timings = @($logTail |
             Where-Object { $_ -match '^\s*(prompt )?eval time\s*=' } | Select-Object -Last 2)
         if ($timings.Count) { 'Latest timings in that log:'; $timings }
     }

@@ -14,6 +14,38 @@ Check ($metrics['llamacpp:requests_processing'] -eq 0) 'Zero is a valid metric'
 Check ($metrics['llamacpp:spec_decode_num_accepted_tokens_per_pos_total'] -eq 5) 'Labeled series are aggregated'
 Check ((ConvertFrom-ServerMetrics '').Count -eq 0) 'Disabled metrics are unavailable, not invented totals'
 
+$launch=Get-ServerLaunchOptions '"C:\llama.cpp\bin\llama-server.exe" --reasoning=on --reasoning-budget -1 -n 12288 -ctk f16 --cache-type-v q8_0 -fa on --cache-ram 0 --cache-prompt --no-cache-prompt --chat-template-file "C:\templates with spaces\coding.jinja" --api-key "secret --reasoning off"'
+Check ($launch['--reasoning'] -eq 'on' -and $launch['--reasoning-budget'] -eq '-1') 'Equals syntax and negative reasoning budget parse correctly'
+Check ($launch['--cache-prompt'] -eq 'off' -and $launch['--cache-ram'] -eq '0') 'Disabled cache and zero cache RAM are preserved'
+Check ($launch['--chat-template-file'] -eq 'C:\templates with spaces\coding.jinja' -and $launch['--flash-attn'] -eq 'on') 'Quoted paths and flag aliases parse correctly'
+$props=[pscustomobject]@{
+    default_generation_settings=[pscustomobject]@{params=[pscustomobject]@{n_predict=-1;reasoning_format='deepseek';reasoning_in_content=$false}}
+    chat_template_caps=[pscustomobject]@{supports_tools=$true;supports_tool_calls=$true}
+}
+$lines=(Get-ServerInferenceLines $launch $props) -join "`n"
+Check ($lines -match 'no separate thinking cap' -and $lines -match 'Launch output allowance: 12288') 'Launch thinking and total output limits shown separately'
+Check ($lines -match 'in content=false, budget=unavailable' -and $lines -match 'n_predict=-1') 'API false, missing budget and unlimited output remain distinct'
+Check ($lines -notmatch 'secret') 'Status does not disclose unrelated sensitive command arguments'
+$unset=(Get-ServerInferenceLines @{} $null) -join "`n"
+Check ($unset -match 'not set \(runtime/model default\)' -and $unset -match 'budget=unavailable') 'Missing API and launch fields do not invent disabled settings'
+
+& {
+    function Get-Process { param($Id,$ErrorAction) throw 'Fixture: process counters unavailable' }
+    function Read-ServerEndpoint {
+        param($Port,$Path,[switch]$Text)
+        switch ($Path) {
+            'health' { [pscustomobject]@{status='ok'} }
+            'props' { $props }
+            'slots' { [pscustomobject]@{id=0;is_processing=$false;tokens_cached=0;n_past=20;n_prompt_tokens=25;params=[pscustomobject]@{cache_prompt=$false;reasoning_budget=0;n_predict=100}} }
+            'metrics' { "llamacpp:kv_cache_tokens 0`nllamacpp:kv_cache_usage_ratio 0" }
+        }
+    }
+    $server=[pscustomobject]@{Name='llama-server.exe';ProcessId=0;ExecutablePath=(Join-Path (Split-Path -Parent $PSScriptRoot) 'bin\llama-server.exe');CreationDate=[datetime]::MaxValue;CommandLine='llama-server.exe --reasoning off --reasoning-budget 0'}
+    $snapshot=(Get-ServerStatusLines $server 65001) -join "`n"
+    Check ($snapshot -match 'Live KV cache metrics: tokens=0 \| Usage: 0[.,]0%') 'Live zero KV tokens/usage are not treated as missing'
+    Check ($snapshot -match 'thinking budget=0, cache_prompt=false' -and $snapshot -match 'cached=0, past=20, prompt=25') 'Per-task cache and reasoning values displayed'
+}
+
 # These tests replace all destructive operations; no real server is stopped.
 & {
     $exe = Join-Path (Split-Path -Parent $PSScriptRoot) 'bin\llama-server.exe'

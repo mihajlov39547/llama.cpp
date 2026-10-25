@@ -10,8 +10,20 @@ function Get-LocalModelProfiles {
             Gpu='auto'; Threads=4; Batch=512; UBatch=128; KV='f16'
             Context=49152; Output=12288; Reserved=12288
             SingleTemplate=($file.Name -match 'gemma-4-')
+            Reasoning='off'; ReasoningBudget=0; FlashAttention=$null
+            Temperature=$null; TopP=$null; TopK=$null; MinP=$null
+            SystemPromptFile=$null
         }
         switch -Regex ($file.Name) {
+            '^qwen3\.5-4B-super-coder\.Q4_0\.gguf$' {
+                $p.Label='Qwen3.5 4B Super Coder Q4_0'
+                $p.Context=32768
+                # Output includes both thinking and the final answer; retain the 12K allowance.
+                $p.Reasoning='on'; $p.ReasoningBudget=-1; $p.FlashAttention='on'
+                $p.Temperature=0.6; $p.TopP=0.95; $p.TopK=20; $p.MinP=0.0
+                $p.SystemPromptFile=Join-Path $PSScriptRoot 'templates\super-coder-system.txt'
+                break
+            }
             '^google_gemma-4-E2B-it-Q4_K_M\.gguf$' {
                 $p.Key='gemma'; $p.Alias='gemma-4-local'; $p.Label='Gemma 4 E2B Q4_K_M'; break
             }
@@ -26,5 +38,22 @@ function Get-LocalModelProfiles {
             }
         }
         $p
+    }
+}
+
+# One argument builder keeps server, CLI and OpenCode inference settings aligned.
+function Get-ModelInferenceArguments {
+    param([Parameter(Mandatory=$true)]$Profile)
+    '--reasoning'; [string]$Profile.Reasoning
+    '--reasoning-budget'; [string]$Profile.ReasoningBudget
+    if ($Profile.FlashAttention) { '--flash-attn'; $Profile.FlashAttention }
+    foreach ($entry in @(
+        @('--temp', $Profile.Temperature), @('--top-p', $Profile.TopP),
+        @('--top-k', $Profile.TopK), @('--min-p', $Profile.MinP)
+    )) {
+        if ($null -ne $entry[1]) {
+            $entry[0]
+            ([double]$entry[1]).ToString([Globalization.CultureInfo]::InvariantCulture)
+        }
     }
 }
