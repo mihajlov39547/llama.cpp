@@ -1,4 +1,5 @@
 # Shared launcher defaults. Discover files each run so removed models disappear.
+. (Join-Path $PSScriptRoot 'runtime-paths.ps1')
 function Get-LocalModelProfiles {
     param([string]$ModelDirectory = (Join-Path $PSScriptRoot 'models'))
     $files = @(Get-ChildItem -LiteralPath $ModelDirectory -Filter '*.gguf' -File -Recurse |
@@ -13,10 +14,12 @@ function Get-LocalModelProfiles {
             Reasoning='off'; ReasoningBudget=0; FlashAttention=$null
             Temperature=$null; TopP=$null; TopK=$null; MinP=$null
             SystemPromptFile=$null
+            UseMtpRuntime=$false
         }
         switch -Regex ($file.Name) {
             '^qwen3\.5-4B-super-coder\.Q4_0\.gguf$' {
                 $p.Label='Qwen3.5 4B Super Coder Q4_0'
+                $p.UseMtpRuntime=$true
                 $p.Context=32768
                 # Output includes both thinking and the final answer; retain the 12K allowance.
                 $p.Reasoning='on'; $p.ReasoningBudget=-1; $p.FlashAttention='on'

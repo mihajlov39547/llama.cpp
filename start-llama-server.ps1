@@ -68,6 +68,8 @@ $apiOnly = ($modeIndex -eq 0)
 $selectedModel = $models[$selectedIndex]
 # Shared Gemma-4 defaults; existing Qwen profiles retain their tuned settings.
 $p = $profiles[$selectedIndex]
+$exe = Get-ModelExecutable -Profile $p -Engine server
+Write-Host "Runtime: $exe"
 $gpuLayers = $p.Gpu
 $cpuThreads = $p.Threads
 $contextSize = $p.Context
@@ -121,7 +123,7 @@ $arguments += $chatTemplateArguments
 if ($apiOnly) { $arguments += '--no-webui' }
 
 Write-Host ('Command: & "{0}" {1}' -f $exe, ($arguments -join ' '))
-$process = Start-Process -FilePath $exe -ArgumentList $arguments -WorkingDirectory (Join-Path $root 'bin') -WindowStyle Hidden -RedirectStandardOutput (Join-Path $logDir 'llama-server.stdout.log') -RedirectStandardError (Join-Path $logDir 'llama-server.stderr.log') -PassThru
+$process = Start-Process -FilePath $exe -ArgumentList $arguments -WorkingDirectory (Split-Path -Parent $exe) -WindowStyle Hidden -RedirectStandardOutput (Join-Path $logDir 'llama-server.stdout.log') -RedirectStandardError (Join-Path $logDir 'llama-server.stderr.log') -PassThru
 Save-ServerLogRecord $process $port (Join-Path $logDir 'llama-server.stdout.log') (Join-Path $logDir 'llama-server.stderr.log')
 
 Write-Host 'Waiting for the server to become ready (up to 180 seconds)...'
@@ -137,7 +139,8 @@ for ($attempt = 0; $attempt -lt 180; $attempt++) {
 }
 
 if (-not $ready) {
-    Write-Warning "Server not confirmed ready. Check logs\llama-server.stderr.log. Address: $serverUrl"
+    $details=Get-ServerFailureDetails (Join-Path $logDir 'llama-server.stderr.log')
+    Write-Warning "Server not confirmed ready. Address: $serverUrl`n$details"
     exit 1
 }
 

@@ -53,6 +53,8 @@ $selectedModel = $models[$selectedIndex]
 
 # Shared Gemma-4 defaults; existing Qwen profiles retain their tuned settings.
 $p = $profiles[$selectedIndex]
+$exe = Get-ModelExecutable -Profile $p -Engine cli
+Write-Host "Runtime: $exe"
 $gpuLayers = $p.Gpu
 $cpuThreads = $p.Threads
 $contextSize = $p.Context
@@ -102,7 +104,7 @@ Write-Host "Context: $contextSize | batch: $batchSize | microbatch: $microBatchS
 Write-Host 'Press Ctrl+C to stop.'
 Write-Host ''
 
-Push-Location (Join-Path $root 'bin')
+Push-Location (Split-Path -Parent $exe)
 try {
     & $exe @arguments
 } finally {

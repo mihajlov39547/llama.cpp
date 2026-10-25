@@ -47,6 +47,8 @@ if (-not $profiles.Count) { throw "No GGUF models in $modelDir" }
 $index = Show-ModelMenu -Items $profiles -Title 'OpenCode + llama.cpp launcher'
 if ($index -lt 0) { return }
 $p = $profiles[$index]
+$serverExe = Get-ModelExecutable -Profile $p -Engine server
+Write-Host "Runtime: $serverExe"
 $modelPath = $p.File
 if (-not (Test-Path -LiteralPath $modelPath -PathType Leaf)) { throw "Missing model: $modelPath" }
 $context = [int]$p.Context
@@ -85,7 +87,7 @@ Write-Host "Context: $context | GPU: $($p.Gpu) | CPU threads: $($p.Threads) | KV
 Write-Host "API: $serverUrl/v1 | Project: $project"
 Write-Host ("Inference: " + ((Get-ModelInferenceArguments -Profile $p) -join ' '))
 if ($p.Reasoning -eq 'on') { Write-Host 'The response allowance includes thinking plus the final answer.' }
-if ($p.Label -match 'Qwen') { Write-Warning 'Qwen with larger OpenCode context may exceed 4 GiB VRAM even with the original GPU profile.' }
+if ($p.Label -match 'Qwen' -and $p.Gpu -eq 'all') { Write-Warning 'Qwen with larger OpenCode context may exceed 4 GiB VRAM even with the original GPU profile.' }
 Write-Host 'Starting llama-server; logs: logs\opencode-server.stdout.log / logs\opencode-server.stderr.log' -ForegroundColor Cyan
 
 # Capture background server output in local log files.
@@ -102,7 +104,10 @@ for ($attempt = 0; $attempt -lt 180; $attempt++) {
     $proc.Refresh()
     if ($proc.HasExited) { break }
 }
-if (-not $healthy) { throw "llama-server did not become healthy. Inspect logs\opencode-server.stderr.log; the OpenCode config was not changed." }
+if (-not $healthy) {
+    $details=Get-ServerFailureDetails (Join-Path $logDir 'opencode-server.stderr.log')
+    throw "llama-server did not become healthy. OpenCode config unchanged.`n$details"
+}
 
 # Check the model alias published by the server, not just /health.
 $api = Invoke-RestMethod -Uri "$serverUrl/v1/models" -TimeoutSec 10

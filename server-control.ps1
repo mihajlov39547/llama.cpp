@@ -1,4 +1,13 @@
 # Local server inspection/control helpers. Never stop a process by name alone.
+. (Join-Path $PSScriptRoot 'runtime-paths.ps1')
+function Get-ServerFailureDetails {
+    param([string]$LogPath)
+    if (-not (Test-Path -LiteralPath $LogPath -PathType Leaf)) { return "No startup log available at $LogPath" }
+    $tail = @(Get-Content -LiteralPath $LogPath -Tail 60 -ErrorAction SilentlyContinue)
+    $errors = @($tail | Where-Object { $_ -match '(?i)error|failed|fatal|unsupported|invalid|unknown argument' } | Select-Object -Last 6)
+    if (-not $errors.Count) { $errors=@($tail | Select-Object -Last 8) }
+    return ("Startup log: $LogPath`n" + ($errors -join "`n"))
+}
 function Get-LocalServerProcess {
     param([int]$Port = 8080)
     $owners = @(Get-NetTCPConnection -State Listen -ErrorAction Stop |
@@ -12,10 +21,9 @@ function Get-LocalServerProcess {
 function Assert-LocalServerIdentity {
     param($Expected, [int]$Port)
     $current = Get-LocalServerProcess -Port $Port
-    $exe = Join-Path $PSScriptRoot 'bin\llama-server.exe'
     if (-not $Expected -or -not $current -or $current.ProcessId -ne $Expected.ProcessId -or
         $current.CreationDate -ne $Expected.CreationDate -or
-        -not [string]::Equals($current.ExecutablePath, $exe, [StringComparison]::OrdinalIgnoreCase)) {
+        -not (Test-WorkspaceServerExecutable $current.ExecutablePath)) {
         throw 'Server identity changed or this port belongs to another application. Refresh status before retrying.'
     }
     $current
@@ -137,8 +145,7 @@ function Get-ServerStatusLines {
     "Address: http://127.0.0.1:$Port | Snapshot: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
     if (-not $Server) { 'No local listening process found.'; return }
     "Process: $($Server.Name) | PID: $($Server.ProcessId)"
-    $expectedExe = Join-Path $PSScriptRoot 'bin\llama-server.exe'
-    if (-not [string]::Equals($Server.ExecutablePath, $expectedExe, [StringComparison]::OrdinalIgnoreCase)) {
+    if (-not (Test-WorkspaceServerExecutable $Server.ExecutablePath)) {
         'This is not this workspace''s llama-server. Stop/restart are blocked.'; return
     }
     try {
@@ -215,7 +222,7 @@ function Get-ServerStatusLines {
         $cacheLines = @($logTail | Where-Object { $_ -match 'cache state:|KV buffer size|KV self size|flash_attn\s*=' } | Select-Object -Last 3)
         if ($cacheLines.Count) { 'Recent cache/attention observations in that log (may be stale):'; $cacheLines }
         $timings = @($logTail |
-            Where-Object { $_ -match '^\s*(prompt )?eval time\s*=' } | Select-Object -Last 2)
+            Where-Object { $_ -match '(?:^|\s)(prompt )?eval time\s*=' } | Select-Object -Last 2)
         if ($timings.Count) { 'Latest timings in that log:'; $timings }
     }
 }
@@ -250,7 +257,7 @@ function Restart-LocalServer {
     $err = Join-Path $dir "llama-server-$Port-$stamp.stderr.log"
     Stop-LocalServer $current $Port
     if (Get-LocalServerProcess $Port) { throw "Port $Port was taken by another process; restart cancelled." }
-    $process = Start-Process -FilePath $current.ExecutablePath -ArgumentList $nativeArguments -WorkingDirectory (Join-Path $PSScriptRoot 'bin') -WindowStyle Hidden -RedirectStandardOutput $out -RedirectStandardError $err -PassThru
+    $process = Start-Process -FilePath $current.ExecutablePath -ArgumentList $nativeArguments -WorkingDirectory (Split-Path -Parent $current.ExecutablePath) -WindowStyle Hidden -RedirectStandardOutput $out -RedirectStandardError $err -PassThru
     Save-ServerLogRecord $process $Port $out $err
     Write-Host "Restarting PID $($process.Id); logs: $err"
     for ($attempt=0; $attempt -lt 180; $attempt++) {

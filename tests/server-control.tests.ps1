@@ -1,6 +1,8 @@
 $ErrorActionPreference = 'Stop'
 . (Join-Path (Split-Path -Parent $PSScriptRoot) 'server-control.ps1')
 function Check($Condition, $Message) { if (-not $Condition) { throw $Message }; Write-Output "PASS: $Message" }
+Check (Test-WorkspaceServerExecutable (Join-Path (Get-SuperCoderRuntimeDirectory) 'llama-server.exe')) 'Isolated Super Coder runtime is manageable'
+Check (-not (Test-WorkspaceServerExecutable 'C:\other\llama-server.exe')) 'Other installations remain outside manager control'
 $metrics = ConvertFrom-ServerMetrics @'
 # TYPE llamacpp:tokens_predicted_total counter
 llamacpp:tokens_predicted_total 1.25e3

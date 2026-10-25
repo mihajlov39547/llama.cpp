@@ -122,9 +122,26 @@ To apply a changed profile, stop the old server with `start-llama-status.ps1`,
 then select Super Coder in the desired launcher. The status manager's Restart
 replays the previous command, so it does not pick up edited profile settings.
 
-Local validation: profile/argument/configuration tests pass, but the installed
-b8729 server cannot load the current Super Coder GGUF. It reports
-`missing tensor 'blk.32.ssm_conv1d.weight'`; the file advertises
-`qwen35.block_count = 33`. This occurs during model loading, before inference.
-See `logs/verification/super-coder.stderr.log`. A compatible model/runtime is
-needed before generation can be validated; the GGUF and binaries were not modified.
+Super Coder requires the isolated official [llama.cpp b11883 CUDA 12.4 runtime](https://github.com/ggml-org/llama.cpp/releases/tag/b11883)
+in `bin/runtimes/b11883-cuda12.4`. `runtime-paths.ps1` selects it for Super Coder
+in all three launchers. Other models continue using the original `bin` runtime.
+The status manager accepts only these two exact server executable paths.
+
+The original b8729 runtime misreads the GGUF's additional MTP prediction head as
+an ordinary recurrent layer and requests the nonexistent
+`blk.32.ssm_conv1d.weight`. Inspection confirmed that the file contains 32 normal
+layers plus the MTP tensors in block 32. The new runtime loads the model without
+editing GGUF metadata or weights. Lowering context does not fix that load error.
+
+The isolated runtime consists of the official
+`llama-b11883-bin-win-cuda-12.4-x64.zip` and
+`cudart-llama-bin-win-cuda-12.4-x64.zip`, extracted into the same directory.
+Downloads were verified against the release's SHA-256 digests; release metadata
+is saved in `logs/verification/runtime-download.json`. Startup failures now show
+relevant stderr lines directly in the launcher, in addition to the log path.
+
+Validation with b11883: Super Coder loaded at 32768 context, exposed the requested
+sampling defaults, and completed a short coding request with reasoning and a
+correct Python addition function. The full OpenCode launcher generated its config
+and reached healthy status on an isolated test port; the status manager inspected
+and stopped it successfully. This is a smoke test, not a coding benchmark.

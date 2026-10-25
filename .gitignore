@@ -12,3 +12,4 @@ opencode/
 opencode-launcher-settings.json
 
 logs/
+bin/runtimes/

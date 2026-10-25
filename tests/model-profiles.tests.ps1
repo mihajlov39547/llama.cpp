@@ -9,6 +9,8 @@ function Check-Argument($Arguments,$Flag,$Value) {
 $profiles=@(Get-LocalModelProfiles)
 $p=$profiles | Where-Object { (Split-Path -Leaf $_.File) -eq 'qwen3.5-4B-super-coder.Q4_0.gguf' }
 Check ($null -ne $p -and $p.Context -eq 32768 -and $p.Output -eq 12288 -and $p.Reserved -eq 12288) 'Super Coder 32K/12K profile'
+Check ((Get-ModelExecutable $p server) -eq (Join-Path (Get-SuperCoderRuntimeDirectory) 'llama-server.exe')) 'Super Coder selects the MTP-compatible runtime'
+Check ((Get-ModelExecutable $p cli) -eq (Join-Path (Get-SuperCoderRuntimeDirectory) 'llama-cli.exe')) 'CLI selects the same compatible runtime'
 Check (-not $p.SingleTemplate -and (Test-Path -LiteralPath $p.SystemPromptFile)) 'Embedded Qwen template and coding prompt'
 $culture=[Threading.Thread]::CurrentThread.CurrentCulture
 try {
@@ -50,4 +52,5 @@ Check ($config.agent.build.temperature -eq 0.6 -and $config.agent.plan.top_p -eq
 Check ($config.instructions[0] -eq $p.SystemPromptFile -and $config.provider['local-llama'].models[$p.Alias].reasoning) 'OpenCode instructions and reasoning capability'
 $gemma=$profiles | Where-Object Key -eq 'gemma'
 Check ($gemma.Context -eq 49152 -and $gemma.SingleTemplate -and $null -eq $gemma.Temperature) 'Gemma settings preserved'
+Check ((Get-ModelExecutable $gemma server) -eq (Join-Path $root 'bin\llama-server.exe')) 'Gemma retains the original runtime'
 Check-Argument @(Get-ModelInferenceArguments $gemma) '--reasoning' 'off'
