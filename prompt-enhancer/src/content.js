@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   globalThis.__promptEnhancerCleanup?.();
-  const { findEditor, readEditorText, replaceEditorText } = globalThis.PromptEnhancerEditor;
+  const { findEditor, readEditorText, readConversationContext, replaceEditorText } = globalThis.PromptEnhancerEditor;
   const Settings = globalThis.PromptEnhancerSettings;
   const host = document.createElement('div');
   host.dataset.promptEnhancerHost = '';
@@ -25,6 +25,7 @@
   const panel = element('section', '', shadow, { 'aria-label': 'Improved Prompt', hidden: '' });
   element('h2', 'Improved Prompt', panel);
   const status = element('p', '', panel, { role: 'status', 'aria-live': 'polite' });
+  const contextStatus = element('p', '', panel, { class: 'disclosure' });
   const preview = element('pre', '', panel, { tabindex: '0' });
   const actions = element('div', '', panel, { class: 'actions' });
   function button(text, parent, action) {
@@ -45,7 +46,7 @@
   const original = element('textarea', '', recovery, { readonly: '', 'aria-label': 'Original prompt' });
   button('Copy original', recovery, () => copyText(original.value));
   const bar = element('div', '', shadow, { class: 'bar' });
-  element('span', 'Improve Prompt sends this draft to your local AI server (127.0.0.1:8080).', bar, { class: 'disclosure' });
+  element('span', 'Improve Prompt sends this draft and the latest question and answer to your local AI server (127.0.0.1:8080).', bar, { class: 'disclosure' });
   const improve = button('✦ Improve Prompt', bar, () => start('improve'));
   improve.dataset.promptEnhancerButton = '';
   let editor = null, route = location.href, snapshot = null, rewrite = '';
@@ -154,7 +155,10 @@
     try { validate(Settings.defaults); }
     catch (error) { message(error.message, true); return; }
     if (!refining) {
-      snapshot = { text, editor, route: location.href, changed: false };
+      snapshot = { text, editor, route: location.href, changed: false, conversationContext: readConversationContext() };
+      contextStatus.textContent = snapshot.conversationContext ?
+        'Context: latest question and answer included (up to 6,000 characters each).' :
+        'Context: no previous question and answer found; improving this draft alone.';
       original.value = text;
       rewrite = '';
       preview.textContent = '';
@@ -174,8 +178,9 @@
       if (pending !== request || disposed) return;
       validate(Settings.settings(settings));
       const result = await chrome.runtime.sendMessage(refining ? {
-        type: 'PE_REFINE', requestId: request.id, originalPrompt: text, previousImprovement
-      } : { type: 'PE_IMPROVE', requestId: request.id, prompt: text });
+        type: 'PE_REFINE', requestId: request.id, originalPrompt: text, previousImprovement,
+        conversationContext: snapshot.conversationContext
+      } : { type: 'PE_IMPROVE', requestId: request.id, prompt: text, conversationContext: snapshot.conversationContext });
       if (pending !== request || disposed) return;
       if (!result?.ok) throw new Error(result?.error?.message || 'The background worker returned no response. Retry.');
       if (typeof result.text !== 'string' || !result.text.trim()) throw new Error('No usable rewrite was returned.');

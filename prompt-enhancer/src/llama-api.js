@@ -2,11 +2,12 @@
   'use strict';
   const { defaults, settings, validatePrompt, validateRefinement, ApiError } = globalThis.PromptEnhancerSettings;
   async function run(prompt, rawSettings, {
-    signal, fetchImpl = fetch, testOnly = false, mode = 'improve', previousImprovement
+    signal, fetchImpl = fetch, testOnly = false, mode = 'improve', previousImprovement, conversationContext
   } = {}) {
     const config = settings(rawSettings);
     if (!['improve', 'refine'].includes(mode)) throw new ApiError('INPUT', 'Unknown request mode.');
     const refining = mode === 'refine';
+    const context = testOnly ? null : globalThis.PromptEnhancerSettings.validateConversationContext(conversationContext);
     if (!testOnly) {
       if (refining) validateRefinement(prompt, previousImprovement, config);
       else validatePrompt(prompt, config);
@@ -46,8 +47,10 @@
         temperature: refining ? Math.min(config.temperature + 0.1, 2.0) : config.temperature,
         max_tokens: config.maxTokens,
         messages: [
-          { role: 'system', content: refining ? globalThis.PromptEnhancerRefinementInstruction : globalThis.PromptEnhancerInstruction },
-          { role: 'user', content: refining ? globalThis.buildPromptEnhancerRefinement(prompt, previousImprovement) : prompt }
+          { role: 'system', content: (refining ? globalThis.PromptEnhancerRefinementInstruction : globalThis.PromptEnhancerInstruction) +
+            (context ? '\n\n' + globalThis.PromptEnhancerContextInstruction : '') },
+          { role: 'user', content: globalThis.buildPromptEnhancerContext(
+            refining ? globalThis.buildPromptEnhancerRefinement(prompt, previousImprovement) : prompt, context, refining) }
         ]
       });
       const choice = data?.choices?.[0];

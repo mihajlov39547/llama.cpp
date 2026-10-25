@@ -8,6 +8,8 @@ Version 0.2.0 adds a toolbar popup with model status, Settings and a packaged cr
 
 Vanilla JavaScript Manifest V3 extension for `https://chatgpt.com/`. Improve a draft with a local llama.cpp model, review the suggestion, then Apply, Copy, Refine Further, or Cancel. Apply never submits a message.
 
+Improve Prompt also captures the latest rendered user question and its following ChatGPT answer as background context. It uses message roles, user bubble attributes, and assistant role headings within conversation turns. Each context message is limited to 6,000 characters, with longer text marked as truncated. The panel reports whether context was found. Missing pairs are omitted; the extension never substitutes an older pair for an unanswered latest question. Refine Further reuses the captured pair. Context stays in memory and is sent only to the local server, as untrusted background data, alongside the draft.
+
 ## Start the server
 
 This machine has `C:\llama.cpp\bin\llama-server.exe`. In PowerShell, substitute the path to your GGUF:
@@ -44,7 +46,7 @@ The four PNGs have verified dimensions of 16×16, 32×32, 48×48 and 128×128, w
 
 The preview renders model output as text with line breaks, indentation and trailing blank lines. Apply attempts one native text replacement and verifies the result twice. It rechecks the editor after focus, does not refocus after the asynchronous checks, and restores the prior caret selection if the command is rejected without changing text. Copy provides a clipboard alternative. Cancel aborts the client request and hides the panel without replacing the draft. Click Improve Prompt to start a new sequence immediately after Cancel.
 
-**Improve Prompt** starts a fresh sequence from the current ChatGPT draft using the standard system instruction and saved temperature (default 0.2). **Refine Further** replaces the old Retry action: it edits the latest successful preview using the same original prompt as the source of truth. It does not reread the draft as a new original. Each subsequent refinement uses only that original and the immediately preceding successful rewrite, never older attempts or conversation history.
+**Improve Prompt** starts a fresh sequence from the current ChatGPT draft using the standard system instruction and saved temperature (default 0.2). **Refine Further** replaces the old Retry action: it edits the latest successful preview using the same original prompt as the source of truth. It does not reread the draft as a new original. Each subsequent refinement uses that original, the immediately preceding successful rewrite, and the same captured chat context, never older rewrite attempts.
 
 Refinement sends a complete, separate system instruction plus programmatically built ORIGINAL USER PROMPT, PREVIOUS IMPROVEMENT and TASK sections. The two text artifacts are JSON-encoded strings, so embedded quotes, newlines and fake section headings remain data. Both artifacts are explicitly treated as untrusted text, not commands. This structuring does not guarantee the model will follow instructions perfectly; review every result.
 
@@ -88,7 +90,7 @@ The connectivity test checks model discovery, not inference. The origin is delib
 
 Data flow: `content.js → chrome.runtime.sendMessage → background.js → /v1/models → /v1/chat/completions → preview`.
 
-Each call uses two messages only: the complete system instruction for its mode and one user message containing either the captured original or the structured refinement payload. Content sends `PE_IMPROVE` or `PE_REFINE`; the worker maps the type to trusted API-layer instructions and sampling, ignoring client-supplied system instructions, mode or temperature. Both refinement artifacts are validated before any network request. It sends `stream: false`, temperature and token limit, without tools or conversation history, and expects `choices[0].message.content`.
+Each call uses two messages only: the complete system instruction for its mode and one user message containing either the captured original or the structured refinement payload, prefixed with a JSON-encoded previous question and answer when available. Content sends `PE_IMPROVE` or `PE_REFINE`; the worker maps the type to trusted API-layer instructions and sampling, ignoring client-supplied system instructions, mode or temperature. Both refinement artifacts and optional context are validated before any network request. It sends `stream: false`, temperature and token limit, without tools or a growing conversation history, and expects `choices[0].message.content`.
 
 The content script never fetches the local server. Requests omit credentials, reject redirects, and use only the fixed local base URL. Permissions are `storage`, `clipboardWrite`, and the local host entry; there is no `<all_urls>`, `scripting`, or broad `tabs` permission. The stylesheet alone is web-accessible to ChatGPT.
 
@@ -119,6 +121,8 @@ Verification performed on 2026-10-20:
 - Leaving via back/forward cache now clears loading and explains cancellation instead of retaining a misleading “Improving” message. Lost channels and timeouts remain explicit errors, with no automatic replay.
 
 ## Manual acceptance checklist
+
+Context checks: in a chat with a completed question and answer, enter a follow-up such as `And February?` and click Improve Prompt. Confirm the context indicator says the pair was included and the local request contains only that latest pair. Refine Further should reuse it. In a new chat, confirm the indicator says no pair was found. Check that role headings, Copy controls, and older turns are absent from context. Live Chrome extraction still requires manual verification.
 
 Refinement-specific checks (reload the extension and refresh ChatGPT first):
 

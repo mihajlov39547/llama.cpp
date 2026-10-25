@@ -127,6 +127,21 @@ async function previewFixture() {
   await tick();
   return f;
 }
+test('worker forwards bounded chat context for improvement and refinement and rejects malformed context', async () => {
+  const f = worker();
+  const conversationContext = { question: 'Days per month?', answer: 'February has 28 or 29 days.' };
+  for (const type of ['PE_IMPROVE', 'PE_REFINE']) {
+    const result = await f.send({ type, prompt: 'And March?', originalPrompt: 'And March?',
+      previousImprovement: 'How many days are in March?', conversationContext });
+    assert.equal(result.ok, true);
+    const request = JSON.parse(f.calls.at(-1).body);
+    assert.deepEqual(JSON.parse(request.messages[1].content.split('\n')[1]), conversationContext);
+  }
+  const before = f.calls.length;
+  const result = await f.send({ type: 'PE_IMPROVE', prompt: 'draft', conversationContext: { question: 'missing answer' } });
+  assert.equal(result.error.code, 'INPUT');
+  assert.equal(f.calls.length, before);
+});
 const refinements = f => f.messages.filter(message => message.type === 'PE_REFINE');
 test('UI refines the latest successful result only and retains original recovery', async () => {
   const f = await previewFixture();

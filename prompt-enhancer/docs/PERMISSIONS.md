@@ -7,7 +7,7 @@ No new permission was added for the popup or setup guide.
 | `storage` | Save and retrieve only configuration in `chrome.storage.local`. | Retained; no prompt persistence or sync storage. |
 | `clipboardWrite` | Explicit Copy and Copy original actions using `navigator.clipboard.writeText`. Never reads clipboard data. | Retained pending real-Chrome removal testing; not requested for background copying. |
 | `http://127.0.0.1:8080/*` host permission | Worker fetches model discovery and non-streaming completions from the local server. | Retained. API validation fixes the base URL and rejects redirects; do not rely solely on manifest URL matching to constrain network traffic. |
-| Content-script match `https://chatgpt.com/*` | Locate composer, add controls, read draft after Improve Prompt, detect edits/navigation, apply only after user click. | Narrow target website, no general browsing access. |
+| Content-script match `https://chatgpt.com/*` | Locate composer, add controls, read draft and latest question-and-answer pair after Improve Prompt, detect edits/navigation, apply only after user click. | Narrow target website, no general browsing access. |
 | Web-accessible `src/styles.css`, ChatGPT match only | Load packaged styles inside the content script's Shadow DOM. | No scripts/data exposed this way. |
 
 `action`, icons, the popup and `options_page` are manifest features, not additional permissions. Opening the local setup page or Settings does not require `tabs` permission. The worker uses the existing `tabs.onRemoved` event to abort tab requests; it does not enumerate tabs or browse their history.

@@ -60,7 +60,8 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       const result = await API.run(refining ? message.originalPrompt : message.prompt, settings, {
         signal: request.controller.signal, testOnly: isTest,
         mode: refining ? 'refine' : 'improve',
-        previousImprovement: refining ? message.previousImprovement : undefined
+        previousImprovement: refining ? message.previousImprovement : undefined,
+        conversationContext: isTest ? undefined : message.conversationContext
       });
       request.controller.signal.throwIfAborted();
       respond({ ok: true, ...result, ...(isTest ? { endpoint: API.settings(settings).baseUrl } : {}) });

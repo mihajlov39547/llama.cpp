@@ -35,9 +35,10 @@ function dom() {
         for (const match of pattern.matchAll(/\.([\w-]+)/g)) {
           if (!element.classList.contains(match[1])) return false;
         }
-        for (const match of pattern.matchAll(/\[([\w-]+)(?:="([^"]*)")?\]/g)) {
+        for (const match of pattern.matchAll(/\[([\w-]+)(?:(\^?=)"([^"]*)")?\]/g)) {
           if (!element.attributes.has(match[1])) return false;
-          if (match[2] !== undefined && element.getAttribute(match[1]) !== match[2]) return false;
+          if (match[2] === '=' && element.getAttribute(match[1]) !== match[3]) return false;
+          if (match[2] === '^=' && !element.getAttribute(match[1]).startsWith(match[3])) return false;
         }
         return true;
       }

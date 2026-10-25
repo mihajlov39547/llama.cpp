@@ -35,6 +35,17 @@
     }
   }
   const maxPreviousImprovementLength = limits.maxInputLength.max;
+  const maxContextMessageLength = 6000;
+  function validateConversationContext(context) {
+    if (context == null) return null;
+    if (typeof context !== 'object' || Array.isArray(context) ||
+        Object.keys(context).some(key => !['question', 'answer'].includes(key)) ||
+        ['question', 'answer'].some(key => typeof context[key] !== 'string' ||
+          !context[key].trim() || context[key].length > maxContextMessageLength)) {
+      throw new ApiError('INPUT', 'Invalid previous question and answer context.');
+    }
+    return { question: context.question, answer: context.answer };
+  }
   function validateRefinement(originalPrompt, previousImprovement, config) {
     validatePrompt(originalPrompt, config);
     if (typeof previousImprovement !== 'string' || !previousImprovement.trim()) {
@@ -46,6 +57,7 @@
   }
   globalThis.PromptEnhancerSettings = {
     defaults, limits, settings, validatePrompt, validateRefinement, maxPreviousImprovementLength, ApiError,
+    maxContextMessageLength, validateConversationContext,
     responseTimeoutMs: limits.timeoutMs.max + 5000
   };
 })();
