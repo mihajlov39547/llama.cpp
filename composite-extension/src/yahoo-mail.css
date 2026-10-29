@@ -1,0 +1,6 @@
+/* Match only the direct wrapper of Yahoo Mail's Taboola recommendation link.
+   :has() also handles ads inserted later by Yahoo's single-page interface. */
+div:has(> a[href^="https://api.taboola.com/2.0/json/yahoo-mail/recommendations.notify-click?"]),
+section[data-test-id="novation-right-rail"] {
+  display: none !important;
+}

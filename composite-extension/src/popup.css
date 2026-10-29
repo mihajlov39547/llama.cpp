@@ -1,0 +1,7 @@
+:root { color-scheme: light dark; font: 13px/1.5 system-ui, sans-serif; }
+body { width: 330px; margin: 0; padding: 18px; box-sizing: border-box; }
+h1 { font-size: 18px; margin: 0; }
+h2 { font-size: 14px; margin: 0; }
+section { border: 1px solid #718593; border-radius: 10px; padding: 12px; margin-top: 12px; }
+p { overflow-wrap: anywhere; margin: 8px 0 0; }
+.muted { opacity: .75; }

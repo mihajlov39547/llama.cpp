@@ -1,0 +1,17 @@
+﻿{
+  "period": {
+    "start": "2026-10-20",
+    "end": "2026-10-27",
+    "days": 7
+  },
+  "items": [
+    {
+      "model": "qwen3.8-max",
+      "successfulCalls": 59,
+      "total_token": 2028019,
+      "input_token_cache": 1722240,
+      "output_token": 38601,
+      "input_token": 267178
+    }
+  ]
+}

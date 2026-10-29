@@ -1,0 +1,20 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "qwencloud/qwen3.8-max",
+  "provider": {
+    "qwencloud": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "QwenCloud Singapore",
+      "options": {
+        "baseURL": "https://ap-southeast-1.maas.qwencloudapi.com/compatible-mode/v1",
+        "apiKey": "sk-ws-H.DIHPDLI.EbL9.MEUCIAn4GRDCj359x6vDPjsR0Iy3qp_82AS-A3NiF-_pI4pKAiEAlcftjY0ZT6LA3ikNuglxsWETDNaBuKz9yb_TGhJMv-0"
+      },
+      "models": {
+        "qwen3.8-max": {
+          "name": "Qwen3.8-Max"
+        }
+      }
+    }
+  },
+  "permission": "allow"
+}
