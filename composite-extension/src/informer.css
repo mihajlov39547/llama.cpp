@@ -1,7 +1,0 @@
-/* AdOcean generates a different billboard ID for each placement/load.
-   Match its footer close control to hide the entire overlay, not just the ad. */
-div[id^="billboard"]:has(._ado-responsiveFooterBillboard-hover[data-ao-type="close"]) {
-  display: none !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
-}

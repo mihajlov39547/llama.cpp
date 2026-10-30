@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Composite Extension",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "minimum_chrome_version": "111",
   "description": "Block Google ads across websites, hide Yahoo Mail clutter, and block unwanted Pirate Bay navigation.",
   "permissions": ["declarativeNetRequest"],
@@ -11,14 +11,8 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://*.informer.rs/*"],
-      "css": ["src/informer.css"],
-      "all_frames": true,
-      "run_at": "document_start"
-    },
-    {
       "matches": ["http://*/*", "https://*/*"],
-      "css": ["src/google-ads.css"],
+      "css": ["src/google-ads.css", "src/billboards.css"],
       "js": ["src/google-ads.js"],
       "all_frames": true,
       "match_about_blank": true,

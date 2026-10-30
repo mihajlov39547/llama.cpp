@@ -1,0 +1,16 @@
+/* Ad-specific markers keep normal banners and layout containers visible.
+   :has() collapses the supplied outer wrappers, including their spacing.
+   These rules also apply to elements inserted after page load. */
+[id="Billboard" i].wrapperAd,
+[data-placeholder-caption="Oglas" i]:has([id="Billboard" i].wrapperAd),
+.container.desktop-bnr:has([id="Billboard" i].wrapperAd),
+.bnr.billboard:has([id="Billboard" i].wrapperAd),
+div[id^="adocean" i],
+.banner:has([id^="adocean" i]),
+.banner-wrapper:has([id^="adocean" i]),
+.banner-inner:has([id^="adocean" i]),
+div[id^="billboard" i]:has(._ado-responsiveFooterBillboard-hover[data-ao-type="close"]) {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}

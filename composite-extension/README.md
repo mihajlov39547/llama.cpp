@@ -19,9 +19,11 @@ Reload the extension and refresh open pages after upgrading. Chrome may request 
 
 This targets common AdSense/Google Ad Manager ads, not every possible ad format: YouTube video ads, sponsored search results, first-party/proxied ads and closed shadow DOM content are not comprehensively covered. Some sites may show anti-adblock notices. No page text or browsing data is collected or transmitted.
 
-## Informer (0.2.1)
+## Billboard and AdOcean banners on all websites (0.2.2)
 
-On informer.rs and its subdomains, `src/informer.css` hides the entire AdOcean footer billboard, including its translucent background. The selector combines the `billboard` ID prefix with the AdOcean close-control class so randomized ID suffixes do not matter. CSS also applies to banners inserted later. This hides the banner without blocking its network requests.
+`src/billboards.css` runs on all HTTP/HTTPS websites and matching frames. It hides `#Billboard.wrapperAd` slots and the supplied `Oglas`, `.container.desktop-bnr` and `.bnr.billboard` wrappers when they contain that slot. It also hides AdOcean divs identified by their ID prefix and their `.banner`, `.banner-wrapper` and `.banner-inner` ancestors. Matching the outer wrappers removes their reserved space as well.
+
+The previous Informer footer rule now applies globally: it hides the entire AdOcean footer billboard, including its translucent background, using the `billboard` ID prefix and AdOcean close-control class. Randomized suffixes do not matter. CSS also applies to banners inserted later. These are cosmetic rules; they do not block AdOcean network requests or hide every generic element named banner.
 
 ## Yahoo Mail
 
