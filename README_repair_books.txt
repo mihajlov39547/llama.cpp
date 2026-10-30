@@ -5,7 +5,7 @@ Files:
 
 Prerequisites:
   1. llama-server running at http://127.0.0.1:8080
-  2. Model alias gemma4-book-cleaner (verified by /v1/models)
+  2. Model alias gemma-4-local (verified by /v1/models)
   3. English .txt files in C:\llama.cpp\books\prepared-en
   4. All input TXT files must be valid UTF-8; BOM, CRLF and final newline preserved.
 

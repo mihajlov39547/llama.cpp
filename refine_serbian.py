@@ -170,7 +170,7 @@ if __name__=='__main__':
     p.add_argument('--output-dir',default=r'C:\llama.cpp\books\refined-sr-latn')
     p.add_argument('--state-dir',default=r'C:\llama.cpp\books\translation-refinement-runs')
     p.add_argument('--url',default='http://127.0.0.1:8080')
-    p.add_argument('--model',default='gemma4-book-cleaner')
+    p.add_argument('--model',default='gemma-4-local')
     p.add_argument('--template-tag',default='single')
     p.add_argument('--book')
     p.add_argument('--max-lines',type=int,default=0)

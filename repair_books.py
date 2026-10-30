@@ -217,7 +217,7 @@ def main():
     parser.add_argument('--book', help='Only process this filename, e.g. Roderick.txt')
     parser.add_argument('--max-lines', type=int, default=0, help='Pilot only: process first N lines per book, 0=all')
     parser.add_argument('--url', default='http://127.0.0.1:8080')
-    parser.add_argument('--model', default='gemma4-book-cleaner')
+    parser.add_argument('--model', default='gemma-4-local')
     parser.add_argument('--max-tokens', type=int, default=1500)
     parser.add_argument('--timeout', type=int, default=180)
     parser.add_argument('--retries', type=int, default=2)

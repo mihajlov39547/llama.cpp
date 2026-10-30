@@ -5,7 +5,7 @@ Stage 1: prepared-en -> refined-en (English repair_books.py)
 Stage 2: refined-en + translated -> refined-sr-latn (Serbian reference-based revision)
 
 Prerequisites: Python 3.12+, llama.cpp API server already running at 127.0.0.1:8080
-with --alias gemma4-book-cleaner and the single-turn Jinja template.
+with --alias gemma-4-local and the single-turn Jinja template.
 Copy this file, repair_books.py and refine_serbian.py to C:\llama.cpp.
 #>
 [CmdletBinding()]
@@ -17,7 +17,7 @@ param(
     [string]$RootDirectory = $PSScriptRoot,
     [string]$Python = 'python',
     [string]$ApiUrl = 'http://127.0.0.1:8080',
-    [string]$ModelAlias = 'gemma4-book-cleaner'
+    [string]$ModelAlias = 'gemma-4-local'
 )
 $ErrorActionPreference = 'Stop'
 $root=[IO.Path]::GetFullPath($RootDirectory)
