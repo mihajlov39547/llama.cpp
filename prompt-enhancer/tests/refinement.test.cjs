@@ -143,9 +143,10 @@ test('worker forwards bounded chat context for improvement and refinement and re
   assert.equal(f.calls.length, before);
 });
 const refinements = f => f.messages.filter(message => message.type === 'PE_REFINE');
-test('UI refines the latest successful result only and retains original recovery', async () => {
+test('UI refines the latest successful result using the original draft without a recovery control', async () => {
   const f = await previewFixture();
-  const original = f.host().shadowRoot.querySelectorAll('textarea')[0];
+  assert.equal(f.host().shadowRoot.querySelectorAll('textarea').length, 0);
+  assert.equal(f.host().shadowRoot.querySelectorAll('details').length, 0);
   for (const [previous, next] of [['first rewrite', 'second rewrite'], ['second rewrite', 'third rewrite']]) {
     f.control('Refine Further').emit('click');
     await tick();
@@ -153,7 +154,6 @@ test('UI refines the latest successful result only and retains original recovery
     assert.equal(request.originalPrompt, 'original');
     assert.equal(request.previousImprovement, previous);
     assert.equal(f.preview(), previous);
-    assert.equal(original.value, 'original');
     assert.equal(f.control('Apply').disabled, true);
     assert.equal(f.control('Copy').disabled, false);
     request.response.resolve({ ok: true, text: next });
@@ -210,7 +210,7 @@ test('a stale refinement cannot replace a newer initial improvement', async () =
   old.response.resolve({ ok: true, text: 'stale result' });
   await tick();
   assert.equal(f.preview(), 'new result');
-  assert.equal(f.host().shadowRoot.querySelectorAll('textarea')[0].value, 'new original');
+  assert.equal(f.messages.findLast(message => message.type === 'PE_IMPROVE').prompt, 'new original');
 });
 test('changed draft disables refinement and Apply but leaves the previous preview intact', async () => {
   const f = await previewFixture();

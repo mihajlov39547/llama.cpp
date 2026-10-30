@@ -28,7 +28,7 @@ button {
 }
 button:hover:enabled { background: light-dark(#e8e8e8, #454545); }
 button:disabled { opacity: .45; cursor: default; }
-button:focus-visible, textarea:focus-visible, pre:focus-visible {
+button:focus-visible, pre:focus-visible {
   outline: 2px solid #2caa86; outline-offset: 2px;
 }
 section {
@@ -48,13 +48,6 @@ pre {
 }
 pre:empty { display: none; }
 .actions { display: flex; flex-wrap: wrap; gap: 6px; }
-details { margin-top: 10px; }
-summary { cursor: pointer; }
-textarea {
-  display: block; width: 100%; min-height: 90px; margin: 8px 0;
-  resize: vertical; font: inherit; color: inherit;
-  background: light-dark(#fafafa, #303030);
-}
 @media (prefers-reduced-motion: no-preference) {
   button[aria-busy="true"] { animation: pulse 1.2s infinite alternate; }
   @keyframes pulse { to { opacity: .65; } }

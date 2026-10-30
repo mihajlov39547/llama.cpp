@@ -52,13 +52,13 @@ Refinement sends a complete, separate system instruction plus programmatically b
 
 Refinement temperature is `Math.min(config.temperature + 0.1, 2.0)` (default approximately 0.3). Saved settings are never mutated. Output tokens, timeout, model discovery and `stream: false` are unchanged. The original uses the saved maximum input length (up to 20,000 characters); the previous improvement has its own fixed 20,000-character maximum. At most 40,000 artifact characters are supplied, plus bounded JSON escaping and fixed instructions.
 
-During refinement the previous preview and recovery copy stay visible; only a successful, non-stale response replaces the preview. Apply and Refine Further are disabled while processing; Copy remains available. If refinement fails, the previous result remains applicable and can be refined again. Cancellation hides the panel as before and ignores late results. Nothing is silently resent.
+During refinement the previous preview stays visible; only a successful, non-stale response replaces the preview. Apply and Refine Further are disabled while processing; Copy remains available. If refinement fails, the previous result remains applicable and can be refined again. Cancellation hides the panel as before and ignores late results. Nothing is silently resent.
 
 If the draft, editor instance, or chat changes after a request starts, Apply and Refine Further are disabled. Use Improve Prompt to start from the new draft, or Copy to merge the suggestion yourself. If the first request fails, Refine Further remains disabled because there is no previous improvement; use Improve Prompt to try again.
 
 After Apply successfully inserts and verifies the rewrite, the Improved Prompt panel closes automatically. If replacement fails, the panel stays open with the error and Copy fallback.
 
-Before applying, expand **Original prompt (recovery copy)** to select or copy the captured original. It remains in page memory after Apply, until the next request or page unload, but the panel is closed. Native editing also allows Ctrl+Z. Copy the original before applying or refreshing if you need durable recovery; prompts are not persisted to extension storage.
+The panel shows only the improved prompt and its actions. The original draft is kept internally for refinement and changed-draft protection; it has no recovery view or Copy original button. Native editing also allows Ctrl+Z; prompts are not persisted to extension storage.
 
 Options are stored in `chrome.storage.local`:
 
@@ -77,7 +77,7 @@ The connectivity test checks model discovery, not inference. The origin is delib
 - `manifest.json`: MV3 manifest, ChatGPT content-script matching, local host permission, options page, and packaged stylesheet resource.
 - `src/editor.js`: ordered editor selectors, paragraph/line-break extraction, native replacement and verification. Loaded before `content.js` as a classic script.
 - `src/settings.js`: shared defaults, numeric bounds, settings/input validators and response watchdog duration. Loaded by content scripts, options and worker; saved settings retain the original schema.
-- `src/content.js`: Shadow DOM controls, MutationObserver reattachment, navigation detection, changed-draft protection, request watchdog, recovery copy and cleanup.
+- `src/content.js`: Shadow DOM controls, MutationObserver reattachment, navigation detection, changed-draft protection, request watchdog and cleanup.
 - `src/styles.css`: isolated light/dark composer UI. Uses ChatGPT's root theme class when available, otherwise the system scheme.
 - `src/background.js`: classic service worker using `importScripts`; validates message type, extension ID, top-level ChatGPT sender URL/tab, prompt and request ID. Options connectivity messages are restricted to the extension options page. Tracks one request per tab, handles cancellation and tab closure, and returns structured success/error objects.
 - `src/llama-api.js`: uses the shared settings validator, discovers models, handles timeout/cancellation and HTTP/JSON errors, and parses non-streaming completions.
@@ -136,10 +136,10 @@ Refinement-specific checks (reload the extension and refresh ChatGPT first):
 
 1. Load unpacked; confirm no manifest/service-worker errors in `chrome://extensions`. Run options connection test.
 2. Check the button is visible and fits without overlapping Send. Empty/whitespace-only drafts are rejected on click without an API request; the extension deliberately does not read the draft to disable the button before a click. Check light/dark mode and a narrow window.
-3. Enter multiple paragraphs, blank lines, Shift+Enter line breaks, code, a Windows path and a URL. Improve and inspect **Original prompt** for preserved text.
+3. Enter multiple paragraphs, blank lines, Shift+Enter line breaks, code, a Windows path and a URL. Improve and inspect the outgoing local request for preserved draft text.
 4. In the service-worker inspector's Network panel, confirm model discovery and a POST with `stream: false`, the discovered model, the full system instruction and the exact draft. Repeat and confirm no history accumulates.
 5. Confirm loading state prevents duplicate requests. Verify preview line breaks and that HTML-like output is shown literally.
-6. Apply; confirm only the draft changes. Type another character, move focus away/back, and check the rewrite persists. Verify Ctrl+Z and Copy original recovery. Confirm no user message appeared in the conversation.
+6. Apply; confirm only the draft changes. Type another character, move focus away/back, and check the rewrite persists. Verify Ctrl+Z. Confirm no user message appeared in the conversation.
 7. Copy and paste into a separate text field. Cancel a preview and cancel while processing; confirm the original draft remains untouched and late responses do not reopen the panel.
 8. Modify the draft during inference and after preview. Apply and Refine Further must be disabled; Improve Prompt must start a new sequence using the changed draft. Editing then undoing must still require a fresh sequence.
 9. Navigate between chats, start a new chat, and trigger composer recreation. There must be one control row; stale suggestions must not apply to the new composer. Improve Prompt should work.
@@ -152,7 +152,7 @@ Refinement-specific checks (reload the extension and refresh ChatGPT first):
 ### Exact Chrome hardening verification
 
 1. Open `chrome://extensions`, click **Reload** on Local Prompt Enhancer, then refresh the ChatGPT tab. In extension **Details → Extension options**, save default values and click **Test saved connection**. Confirm no extension errors.
-2. Open ChatGPT DevTools, enable the device toolbar, and test viewport widths **360 px** and **1280 px**. Repeat with ChatGPT Settings → General → Theme set to Light and Dark. Confirm exactly one Improve Prompt row above the composer; expand the preview and Original prompt details, and confirm neither covers the editable area or Send.
+2. Open ChatGPT DevTools, enable the device toolbar, and test viewport widths **360 px** and **1280 px**. Repeat with ChatGPT Settings → General → Theme set to Light and Dark. Confirm exactly one Improve Prompt row above the composer; open the preview and confirm it does not cover the editable area or Send.
 3. Enter this text using Shift+Enter for line breaks, with two empty lines between the first and second sections:
 
    ````text
@@ -170,10 +170,10 @@ Refinement-specific checks (reload the extension and refresh ChatGPT first):
    ```
    ````
 
-   Click **Improve Prompt**, expand **Original prompt**, and compare paths, URL, blank lines, indentation and backslashes. If ChatGPT renders lists/code as rich nodes, inspect the editor in Elements and repeat with those rendered nodes; plain Markdown typing alone does not test rich list extraction.
-4. Click **Apply**. Confirm the draft changes but no conversation message appears. Type a character, move focus elsewhere and back, and verify the rewrite persists. Use **Ctrl+Z** to inspect native undo behavior (the last typed character may be undone first). Verify **Copy** and **Copy original** by pasting into Notepad. Do not click Send during this check.
+   Click **Improve Prompt** and inspect the outgoing local request to compare paths, URL, blank lines, indentation and backslashes. If ChatGPT renders lists/code as rich nodes, inspect the editor in Elements and repeat with those rendered nodes; plain Markdown typing alone does not test rich list extraction.
+4. Click **Apply**. Confirm the draft changes but no conversation message appears. Type a character, move focus elsewhere and back, and verify the rewrite persists. Use **Ctrl+Z** to inspect native undo behavior (the last typed character may be undone first). Verify **Copy** by pasting into Notepad. Do not click Send during this check.
 5. Start another request, click **Cancel**, then immediately click **Improve Prompt**. Confirm the second request starts without a BUSY error. Cancel again and wait longer than the original request's expected duration: the panel must stay closed. A late result must never replace a newer preview.
-6. Start a request and edit the draft, then press Ctrl+Z to restore the original text. On response, **Apply and Refine Further must still be disabled**. Click **Improve Prompt** and confirm Original prompt reflects the current draft.
+6. Start a request and edit the draft, then press Ctrl+Z to restore the original text. On response, **Apply and Refine Further must still be disabled**. Click **Improve Prompt** and confirm the new request uses the current draft.
 7. While a request is running, open another chat or start a new chat. Confirm one control row remains, the old request cannot apply, and the new draft is untouched. Navigate Back/Forward and confirm the UI is not stuck loading.
 8. In extension options, save **Maximum input characters = 10**. In ChatGPT enter `12345678901` and click Improve Prompt. Expect the 10-character error without a completion request. Replace it with `1234567890`: it should be accepted. Restore **20,000** afterward.
 9. Save **Timeout = 1 second** and request a sufficiently long rewrite. If inference exceeds that time, expect a timeout error with no draft change or automatic resend. Restore **60 seconds**. A faster model may finish before the timeout.
@@ -182,13 +182,13 @@ Refinement-specific checks (reload the extension and refresh ChatGPT first):
 
 ## Limitations
 
-- ChatGPT provides no public editor integration API. This MVP uses native `execCommand('insertText')`, rather than direct DOM assignment or private ProseMirror internals. The command is deprecated and could stop working in a future browser. Verification checks visible text after 100 and 300 ms; it cannot prove private editor state or prevent a later site regression. Failed verification leaves the observed draft alone and exposes Copy/recovery instead of risking an automatic rollback over newer typing.
+- ChatGPT provides no public editor integration API. This MVP uses native `execCommand('insertText')`, rather than direct DOM assignment or private ProseMirror internals. The command is deprecated and could stop working in a future browser. Verification checks visible text after 100 and 300 ms; it cannot prove private editor state or prevent a later site regression. Failed verification leaves the observed draft alone and exposes Copy instead of risking an automatic rollback over newer typing.
 - The button uses its own row above the composer form, outside its internal editor/Send layout. Future DOM/layout changes may require selector or placement updates; no pixel-level non-overlap guarantee is inferred from mocked tests.
 - This is a plain-text enhancer; it does not send attachments or serialize rich editor metadata. Review technical details in every rewrite.
 - The 60-second AbortController timeout is an upper bound, not a guarantee that Chrome will keep the worker alive. Chrome can terminate a worker when a fetch response takes over 30 seconds. Lost messaging channels and the 65-second content watchdog show errors and permit Retry. Requests are not resumed or silently replayed. See [Chrome's service-worker lifecycle documentation](https://developer.chrome.com/docs/extensions/develop/concepts/service-workers/lifecycle).
 - Cancel aborts fetch and ignores late results; the server may continue inference until it notices disconnection.
 - The first valid discovered model is selected. Authenticated endpoints, alternate origins, streaming and multi-model selection are outside this MVP. A 20,000-character input may still exceed a particular model/server context limit; server errors are surfaced.
-- Recovery is in-memory plain text and is replaced by a new Improve Prompt request. Refine Further preserves the same original recovery copy. It is not a persistent backup. Failed clipboard access leaves selectable text for manual Ctrl+C.
+- The original draft is kept internally in memory and is replaced by a new Improve Prompt request. Refine Further reuses that original draft. It is not a persistent backup. Failed clipboard access leaves selectable text for manual Ctrl+C.
 
 ## Release preparation
 

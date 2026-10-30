@@ -8,7 +8,7 @@ Suggested sequence:
 
 1. **Toolbar status:** open the actual popup with the local server connected. Show product name, version 0.2.0, actual model name, endpoint and setup/settings actions. A popup is smaller than 1280×800: capture it in the full Chrome window, rather than stretching its pixels.
 2. **Initial improvement:** ChatGPT composer containing a harmless synthetic draft with the real successful Improved Prompt preview open. Show the local-processing disclosure and Apply/Copy/Refine Further/Cancel.
-3. **Refinement:** after a successful Refine Further call, show the actual updated suggestion and preserved original recovery view. Do not replace model text in an image editor.
+3. **Refinement:** after a successful Refine Further call, show the actual updated suggestion and the Apply, Copy, Refine Further and Cancel actions. Do not replace model text in an image editor.
 4. **User control:** after Apply, show the resulting draft and closed preview, with no submitted message. Use only a test conversation/account with no private information.
 5. **Setup/Settings:** show the real packaged guide or settings page, including the independently running local server requirement.
 

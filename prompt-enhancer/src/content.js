@@ -41,10 +41,6 @@
   const copy = button('Copy', actions, () => copyText(rewrite));
   const refine = button('Refine Further', actions, () => start('refine'));
   const cancelButton = button('Cancel', actions, cancel);
-  const recovery = element('details', '', panel);
-  element('summary', 'Original prompt (recovery copy)', recovery);
-  const original = element('textarea', '', recovery, { readonly: '', 'aria-label': 'Original prompt' });
-  button('Copy original', recovery, () => copyText(original.value));
   const bar = element('div', '', shadow, { class: 'bar' });
   element('span', 'Improve Prompt sends this draft and the latest question and answer to your local AI server (127.0.0.1:8080).', bar, { class: 'disclosure' });
   const improve = button('✦ Improve Prompt', bar, () => start('improve'));
@@ -80,7 +76,6 @@
     cancelButton.disabled = applying;
     refine.disabled = !!pending || applying || !rewrite || !current();
     refine.setAttribute('aria-busy', String(pending?.mode === 'refine'));
-    recovery.hidden = !snapshot;
   }
   function stopRequest() {
     const request = pending;
@@ -125,7 +120,7 @@
       }
       if (host.hidden) host.hidden = false;
     } else {
-      // Keep recovery/error accessible during composer removal.
+      // Keep the suggestion/error accessible during composer removal.
       if (!host.isConnected && snapshot) document.body.append(host);
       if (host.hidden !== !snapshot) host.hidden = !snapshot;
     }
@@ -159,7 +154,6 @@
       contextStatus.textContent = snapshot.conversationContext ?
         'Context: latest question and answer included (up to 6,000 characters each).' :
         'Context: no previous question and answer found; improving this draft alone.';
-      original.value = text;
       rewrite = '';
       preview.textContent = '';
     }
@@ -207,7 +201,7 @@
     try {
       await replaceEditorText(saved.editor, saved.text, rewrite,
         () => snapshot === saved && !saved.changed && location.href === saved.route && editor === saved.editor);
-      saved.changed = true; // Prevent a second Apply; preserve original recovery.
+      saved.changed = true; // Prevent a second Apply.
       panel.hidden = true;
     } catch (error) {
       saved.changed = true;

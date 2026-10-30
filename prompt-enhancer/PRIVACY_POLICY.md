@@ -8,7 +8,7 @@ Publisher/contact: **[PUBLISHER NAME AND PRIVACY CONTACT — complete before pub
 
 Local Prompt Enhancer edits prompts in the ChatGPT composer using a separately running llama.cpp server chosen and operated by the user. It does not provide a developer-hosted AI service.
 
-The content script runs only on `https://chatgpt.com/*`. It locates the composer and observes DOM changes to attach its controls. It inspects the current ChatGPT page URL locally to detect navigation; it does not store or transmit that URL. Before an Improve Prompt click, it does not extract draft or conversation text. Clicking Improve Prompt reads the draft and the latest rendered user question and following assistant answer, validates them and sends them for improvement. Context is limited to 6,000 characters per message; longer text is marked as truncated. If no pair is found, only the draft is sent. Once a preview/recovery session exists, the extension compares the draft with the captured original to prevent overwriting edits. Changing chats invalidates the preview.
+The content script runs only on `https://chatgpt.com/*`. It locates the composer and observes DOM changes to attach its controls. It inspects the current ChatGPT page URL locally to detect navigation; it does not store or transmit that URL. Before an Improve Prompt click, it does not extract draft or conversation text. Clicking Improve Prompt reads the draft and the latest rendered user question and following assistant answer, validates them and sends them for improvement. Context is limited to 6,000 characters per message; longer text is marked as truncated. If no pair is found, only the draft is sent. Once a preview session exists, the extension compares the draft with the captured original to prevent overwriting edits. Changing chats invalidates the preview.
 
 Refine Further sends the captured original, the latest successful rewrite and the same captured question-and-answer pair, not a growing conversation history. The extension does not intentionally capture older conversation turns, attachments, account information, passwords or cookies. A prompt can itself contain personal or sensitive information; the extension does not filter such information out before sending it to your server.
 
@@ -22,7 +22,7 @@ You control the local server, model, logs, accessibility, security and any forwa
 
 ## Temporary data and storage
 
-Original prompts, captured question-and-answer context, latest suggestions and pending request data are held in page/service-worker memory for the user-facing editing flow, not written to `chrome.storage`, files or a developer database. Starting a new Improve Prompt sequence replaces the old original and preview. Apply closes the panel; Cancel hides it. Neither is a secure erase: the current recovery data can remain in the page's memory until a new sequence, content-script cleanup or page unload. Server-side work/logs may outlive cancellation.
+Original prompts, captured question-and-answer context, latest suggestions and pending request data are held in page/service-worker memory for the user-facing editing flow, not written to `chrome.storage`, files or a developer database. Starting a new Improve Prompt sequence replaces the old original and preview. Apply closes the panel; Cancel hides it. Neither is a secure erase: the captured original and preview data can remain in the page's memory until a new sequence, content-script cleanup or page unload. Server-side work/logs may outlive cancellation.
 
 Configuration (fixed API origin, temperature, token limit, timeout and input limit) is saved in `chrome.storage.local`, not Chrome's sync storage. Change it in Settings. Uninstalling the extension removes its extension storage; you must manage server logs and operating-system clipboard data separately. The extension makes no guarantee of secure erasure from browser/OS memory, crash dumps or backups.
 
@@ -30,7 +30,7 @@ Configuration (fixed API origin, temperature, token limit, timeout and input lim
 
 Apply edits the ChatGPT draft only after an explicit click and attempts to verify the change; it never clicks Send or automatically submits to ChatGPT. The website can observe text in its editor, including the original draft and applied rewrite, according to its own practices. The extension cannot promise that ChatGPT waits for submission before handling draft text.
 
-Copy and Copy original write the chosen text to the system clipboard only when clicked. The extension never reads clipboard contents. Other applications and clipboard history/synchronization services may access or retain copied text.
+Copy write the chosen text to the system clipboard only when clicked. The extension never reads clipboard contents. Other applications and clipboard history/synchronization services may access or retain copied text.
 
 Setup-guide links open external sites only when followed. GitHub, ChatGPT, Chrome/Chrome Web Store and the user's server/OS have their own privacy practices, outside this extension's control. No third-party scripts, fonts or tracking pixels are embedded in extension pages.
 

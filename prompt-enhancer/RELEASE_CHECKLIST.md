@@ -20,9 +20,9 @@ Rerun these checks after any runtime change; the ZIP check also detects outdated
 - [ ] Open toolbar popup: verify name/icon/version, Checking → Connected with a real loaded model, model name and endpoint. Stop the server: Refresh must show Disconnected. Confirm the popup never reads or sends draft text (network shows model discovery only).
 - [ ] Open Settings and Setup Guide from popup; follow the guide on supported platforms. Verify links and readability.
 - [ ] On ChatGPT, before any Improve click, verify no draft serialization/API request. Click Improve on empty input: show an error, no API request. The button is intentionally not disabled based on pre-click text inspection.
-- [ ] Improve a multiline synthetic prompt; verify local disclosure, original recovery and response preview.
+- [ ] Improve a multiline synthetic prompt; verify local disclosure, response preview and changed-draft protection.
 - [ ] Refine twice: fixed original/latest-only context, temperature increment, no saved-setting mutation. Test failed refinement preserves preview.
-- [ ] Apply, native undo, Copy, Copy original, Cancel, changed-draft protection, chat navigation and interrupted-worker recovery. Confirm no automatic send or request replay.
+- [ ] Apply, native undo, Copy, Cancel, changed-draft protection, chat navigation and interrupted-worker recovery. Confirm no automatic send or request replay.
 - [ ] Verify normal composer keyboard/Send/attachment behavior, light/dark mode, narrow and wide viewports, no control overlap.
 - [ ] Perform the `clipboardWrite` removal comparison in docs/PERMISSIONS.md; retain only if needed for supported behavior. Rebuild/retest after any change.
 - [ ] See README.md for the longer existing editor/refinement checklist.
