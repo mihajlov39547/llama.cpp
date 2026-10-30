@@ -19,6 +19,10 @@ Reload the extension and refresh open pages after upgrading. Chrome may request 
 
 This targets common AdSense/Google Ad Manager ads, not every possible ad format: YouTube video ads, sponsored search results, first-party/proxied ads and closed shadow DOM content are not comprehensively covered. Some sites may show anti-adblock notices. No page text or browsing data is collected or transmitted.
 
+## Informer (0.2.1)
+
+On informer.rs and its subdomains, `src/informer.css` hides the entire AdOcean footer billboard, including its translucent background. The selector combines the `billboard` ID prefix with the AdOcean close-control class so randomized ID suffixes do not matter. CSS also applies to banners inserted later. This hides the banner without blocking its network requests.
+
 ## Yahoo Mail
 
 On `https://mail.yahoo.com/*`, `src/yahoo-mail.css` hides:
