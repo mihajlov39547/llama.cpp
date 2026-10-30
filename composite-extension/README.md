@@ -19,7 +19,9 @@ Reload the extension and refresh open pages after upgrading. Chrome may request 
 
 This targets common AdSense/Google Ad Manager ads, not every possible ad format: YouTube video ads, sponsored search results, first-party/proxied ads and closed shadow DOM content are not comprehensively covered. Some sites may show anti-adblock notices. No page text or browsing data is collected or transmitted.
 
-## Billboard and AdOcean banners on all websites (0.2.2)
+## Billboard and AdOcean banners on all websites (0.2.3)
+
+Any container labeled `data-placeholder-caption="Oglas"` that contains `.wrapperAd` is hidden in full, regardless of the ad slot ID. This covers `Billboard_2`, `Billboard_3`, `P1` and sticky variants, including their placeholder spacing, on all HTTP/HTTPS sites. It also applies when the ad slot is inserted later.
 
 `src/billboards.css` runs on all HTTP/HTTPS websites and matching frames. It hides `#Billboard.wrapperAd` slots and the supplied `Oglas`, `.container.desktop-bnr` and `.bnr.billboard` wrappers when they contain that slot. It also hides AdOcean divs identified by their ID prefix and their `.banner`, `.banner-wrapper` and `.banner-inner` ancestors. Matching the outer wrappers removes their reserved space as well.
 
