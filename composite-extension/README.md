@@ -9,6 +9,16 @@ Standalone Chrome Manifest V3 extension, following the existing prompt-enhancer 
 3. Click **Load unpacked** and select `C:\llama.cpp\composite-extension`.
 4. Refresh existing Yahoo Mail and Pirate Bay tabs. Pin the extension to view its rule summary.
 
+## Google ads on all websites (0.2.0)
+
+On HTTP/HTTPS pages, including matching embedded frames, CSS immediately hides common Google ad containers and a local script removes them. This includes the supplied `ins.adsbygoogle.adsbygoogle-noablate` fixed banner and its entire contents. Newly inserted ads and elements that acquire ad markers are handled automatically.
+
+Network rules block embedded requests to `doubleclick.net`, `googlesyndication.com`, `googleadservices.com`, `googletagservices.com` and `google.com/pagead/`. Ordinary top-level navigation is excluded. No general Google, Google Fonts, Google APIs or Tag Manager domain block is added.
+
+Reload the extension and refresh open pages after upgrading. Chrome may request access to all websites; allow that access for global ad removal. Chrome's protected pages (such as chrome:// pages and the Web Store) do not allow these content scripts. Incognito requires separately enabling the extension there.
+
+This targets common AdSense/Google Ad Manager ads, not every possible ad format: YouTube video ads, sponsored search results, first-party/proxied ads and closed shadow DOM content are not comprehensively covered. Some sites may show anti-adblock notices. No page text or browsing data is collected or transmitted.
+
 ## Yahoo Mail
 
 On `https://mail.yahoo.com/*`, `src/yahoo-mail.css` hides:
@@ -30,7 +40,7 @@ Limitations: an indirectly created popup can still leave a blank or Chrome-block
 
 ## Privacy and permissions
 
-Only the `declarativeNetRequest` permission is requested for Chrome's built-in blocking rule. Content scripts are limited to the two specified sites. No analytics, external services, saved browsing history, email capture or remote code.
+The `declarativeNetRequest` permission is used for Chrome's built-in blocking rules. Google ad cleanup runs on all HTTP/HTTPS sites; Yahoo and Pirate Bay scripts remain limited to their respective sites. No analytics, external services, saved browsing history, email capture or remote code.
 
 ## Verify
 

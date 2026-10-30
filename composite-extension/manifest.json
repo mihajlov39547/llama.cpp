@@ -1,15 +1,23 @@
 {
   "manifest_version": 3,
   "name": "Composite Extension",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "minimum_chrome_version": "111",
-  "description": "Hide selected Yahoo Mail clutter and block Ultimate Surfer Protector navigation from Pirate Bay.",
+  "description": "Block Google ads across websites, hide Yahoo Mail clutter, and block unwanted Pirate Bay navigation.",
   "permissions": ["declarativeNetRequest"],
   "action": {
     "default_title": "Composite Extension",
     "default_popup": "src/popup.html"
   },
   "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "css": ["src/google-ads.css"],
+      "js": ["src/google-ads.js"],
+      "all_frames": true,
+      "match_about_blank": true,
+      "run_at": "document_start"
+    },
     {
       "matches": ["https://mail.yahoo.com/*"],
       "css": ["src/yahoo-mail.css"],
@@ -33,7 +41,8 @@
   ],
   "declarative_net_request": {
     "rule_resources": [
-      {"id": "piratebay_blocker", "enabled": true, "path": "rules/piratebay.json"}
+      {"id": "piratebay_blocker", "enabled": true, "path": "rules/piratebay.json"},
+      {"id": "google_ads", "enabled": true, "path": "rules/google-ads.json"}
     ]
   }
 }

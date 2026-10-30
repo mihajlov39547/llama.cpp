@@ -1,0 +1,9 @@
+/* Hide the ad container immediately, including fixed AdSense anchor banners. */
+ins.adsbygoogle,
+iframe[id^="google_ads_iframe_"],
+iframe[data-google-query-id],
+div[id^="div-gpt-ad-"] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
