@@ -1,14 +1,18 @@
 # Local Prompt Enhancer
 
-Improve your prompts with local AI.
+Version 0.4.0 fixes incomplete virtualized-chat exports and adds image downloads. Reload the unpacked extension and refresh ChatGPT after updating.
 
-Every improved prompt is written in English: non-English and mixed-language drafts are translated while being improved, and English drafts are polished as usual. For example, `Sta cemo sledece?` becomes `What shall we do next?`. Refine Further also keeps the result in English. Code, paths, URLs, identifiers, and exact literal text are preserved; a request for an answer in another language remains a constraint in the English prompt.
+## Export a chat as Markdown
 
-Version 0.2.0 adds a toolbar popup with model status, Settings and a packaged cross-platform Setup Guide. Opening the popup checks `/v1/models` only; it never captures a ChatGPT draft. Pin the extension in Chrome's toolbar to access it.
+Click **Export chat** on a saved conversation. Text-only chats download as `<chat title>.md`. Chats with images download as `<chat title>.zip`, containing the Markdown file and `export-files/image-001.png` (or the original image format). Extract the entire ZIP together; the Markdown uses relative image links. Both user uploads and generated image assets are supported. Repeated assets are downloaded once.
 
-Vanilla JavaScript Manifest V3 extension for `https://chatgpt.com/`. Improve a draft with a local llama.cpp model, review the suggestion, then Apply, Copy, Refine Further, or Cancel. Apply never submits a message.
+The exporter reads the saved conversation from ChatGPT using your current signed-in session. It follows the selected branch in parent order or loads all older pages of a paginated conversation. It preserves source Markdown, including code and math, instead of scraping the virtualized screen. It excludes alternate branches, internal reasoning and tool logs. Missing branch nodes or unfinished pagination fail visibly instead of downloading a partial conversation. No AI server is required.
 
-Improve Prompt also captures the latest rendered user question and its following ChatGPT answer as background context. It uses message roles, user bubble attributes, and assistant role headings within conversation turns. Each context message is limited to 6,000 characters, with longer text marked as truncated. The panel reports whether context was found. Missing pairs are omitted; the extension never substitutes an older pair for an unanswered latest question. Refine Further reuses the captured pair. Context stays in memory and is sent only to the local server, as untrusted background data, alongside the draft.
+An unavailable or unsupported image does not stop later messages: its position is marked in Markdown and `export-report.txt` explains missing assets. Image requests respect browser CORS; some expired assets or unsupported hosts cannot be downloaded. Supported downloaded formats: PNG, JPEG, WebP, GIF and AVIF. Limits: 40 MB per image, 250 MB total images, 45 seconds per request, 200 older pages. Non-image attachments, arbitrary external images, sandbox links and interactive widgets are not archived; unsupported message formats are marked. Temporary/local chats without a saved `/c/` URL and shared links are not supported.
+
+Wait until the answer finishes, then export without changing branches. **Cancel export** and navigation cancel the operation. Export only runs on a trusted click. Session authentication stays in memory and is sent only to ChatGPT's own API; signed image downloads receive no bearer token. No conversation data is sent to the model or developer services, and no new extension permissions are requested. Downloads remain on your computer until deleted.
+
+Validation: `node --test prompt-enhancer/tests/*.test.cjs`. Automated fixtures cover 248-message ordering, pagination, branch integrity, uploaded/generated image packaging, image failures, cancellation and unchanged drafts. Live account API and CDN compatibility still require a browser acceptance check. ChatGPT's undocumented endpoints may change.
 
 ## Start the server
 
@@ -199,6 +203,6 @@ node scripts/build-release.cjs
 node scripts/build-release.cjs --check
 ```
 
-Output: `release/local-prompt-enhancer-0.2.0.zip`. It includes 20 allowlisted runtime files, with `manifest.json` at the root. The validator checks archive integrity, current source bytes, icons and manifest/HTML/worker references. Tests, docs, source artwork, model files, secrets and existing archives are excluded.
+Output: `release/local-prompt-enhancer-0.4.0.zip`. It includes 21 allowlisted runtime files, with `manifest.json` at the root. The validator checks archive integrity, current source bytes, icons and manifest/HTML/worker references. Tests, docs, source artwork, model files, secrets and existing archives are excluded.
 
 Read `RELEASE_CHECKLIST.md`, `PRIVACY_POLICY.md`, `docs/PERMISSIONS.md`, `docs/POLICY_REVIEW.md`, `store/LISTING.md` and `store/SCREENSHOTS.md` before publishing. Hosted URLs, publisher/contact details, real Chrome acceptance, the clipboard permission comparison, real screenshots and promotional graphics still require publisher work. No store upload or submission has been made.

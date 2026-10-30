@@ -45,6 +45,10 @@
   element('span', 'Improve Prompt sends this draft and the latest question and answer to your local AI server (127.0.0.1:8080).', bar, { class: 'disclosure' });
   const improve = button('✦ Improve Prompt', bar, () => start('improve'));
   improve.dataset.promptEnhancerButton = '';
+  const exportButton = button('Export chat', bar, exportConversation);
+  exportButton.title = 'Save the conversation as Markdown, with images in a ZIP folder when present.';
+  const exportStatus = element('span', '', bar, { class: 'export-status', role: 'status', 'aria-live': 'polite' });
+  let exportController = null;
   let editor = null, route = location.href, snapshot = null, rewrite = '';
   let pending = null, applying = false, disposed = false, scheduled = false;
   const editorEvents = new AbortController();
@@ -68,13 +72,14 @@
   function update() {
     // Do not inspect the draft merely to disable an empty-state button.
     // The explicit Improve action validates emptiness before sending anything.
-    improve.disabled = !!pending || applying || !editor;
+    improve.disabled = !!pending || applying || !!exportController || !editor;
+    exportButton.disabled = !!pending || applying;
     improve.textContent = pending ? '◌ Improving…' : '✦ Improve Prompt';
     improve.setAttribute('aria-busy', String(!!pending));
-    apply.disabled = !!pending || applying || !rewrite || !current();
+    apply.disabled = !!pending || applying || !!exportController || !rewrite || !current();
     copy.disabled = !rewrite;
     cancelButton.disabled = applying;
-    refine.disabled = !!pending || applying || !rewrite || !current();
+    refine.disabled = !!pending || applying || !!exportController || !rewrite || !current();
     refine.setAttribute('aria-busy', String(pending?.mode === 'refine'));
   }
   function stopRequest() {
@@ -85,6 +90,32 @@
       try {
         chrome.runtime.sendMessage({ type: 'PE_CANCEL', requestId: request.id }).catch(() => {});
       } catch { /* Extension may have been reloaded. */ }
+    }
+  }
+  async function exportConversation() {
+    if (exportController) { exportController.abort(); return; }
+    if (pending || applying) return;
+    const controller = new AbortController();
+    exportController = controller;
+    exportButton.textContent = 'Cancel export';
+    exportButton.setAttribute('aria-busy', 'true');
+    exportStatus.textContent = 'Collecting chat messages…';
+    update();
+    try {
+      const result = await globalThis.PromptEnhancerExport.exportChat({
+        signal: controller.signal,
+        progress: count => { exportStatus.textContent = `Collecting chat: ${count} messages…`; }
+      });
+      if (controller.signal.aborted || disposed) return;
+      globalThis.PromptEnhancerExport.download(result);
+      exportStatus.textContent = `Download started: ${result.filename} (${result.count} messages, ${result.imageCount || 0} images${result.warnings ? `, ${result.warnings} warnings: see export-report.txt` : ''}).`;
+    } catch (error) {
+      if (!disposed) exportStatus.textContent = error.message;
+    } finally {
+      exportController = null;
+      exportButton.textContent = 'Export chat';
+      exportButton.setAttribute('aria-busy', 'false');
+      if (!disposed) update();
     }
   }
   function cancel() {
@@ -102,6 +133,7 @@
     if (host.style.colorScheme !== theme) host.style.colorScheme = theme;
     const found = findEditor();
     if (found !== editor || route !== location.href) {
+      if (route !== location.href) exportController?.abort();
       if (snapshot) {
         snapshot.changed = true;
         stopRequest();
@@ -135,7 +167,7 @@
     }
   }
   async function start(mode = 'improve') {
-    if (pending || applying) return;
+    if (pending || applying || exportController) return;
     reconcile();
     const refining = mode === 'refine';
     if (refining && (!rewrite || !current())) return;
@@ -194,7 +226,7 @@
     }
   }
   async function applyRewrite() {
-    if (!current() || pending || applying || !rewrite) return;
+    if (!current() || pending || applying || exportController || !rewrite) return;
     const saved = snapshot;
     applying = true;
     update();
@@ -231,6 +263,7 @@
   function cleanup() {
     if (disposed) return;
     disposed = true;
+    exportController?.abort();
     stopRequest();
     observer.disconnect();
     clearInterval(routeTimer);
@@ -240,6 +273,7 @@
     window.removeEventListener('pageshow', onPageShow);
   }
   function onPageHide(event) {
+    exportController?.abort();
     if (!event.persisted) cleanup();
     else if (pending) {
       stopRequest();

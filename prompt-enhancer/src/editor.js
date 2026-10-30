@@ -157,7 +157,7 @@
       await new Promise(resolve => setTimeout(resolve, 200));
       if (!accepted || !first || editedAfterCommand || !isCurrent() || findEditor() !== editor ||
           readEditorText(editor) !== replacement) {
-        throw new Error('Replacement could not be verified. Check the draft and use Copy. The original is available below; Ctrl+Z can undo native edits.');
+        throw new Error('Replacement could not be verified. Check the draft and use Copy. Ctrl+Z can undo native edits.');
       }
     } finally {
       editor.removeEventListener('input', onInput);

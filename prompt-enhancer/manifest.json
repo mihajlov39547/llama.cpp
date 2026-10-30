@@ -2,8 +2,8 @@
 {
   "manifest_version": 3,
   "name": "Local Prompt Enhancer",
-  "version": "0.2.0",
-  "description": "Improve your prompts with local AI.",
+  "version": "0.4.0",
+  "description": "Improve your prompts with local AI and export ChatGPT conversations as Markdown.",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -27,7 +27,7 @@
   "content_scripts": [
     {
       "matches": ["https://chatgpt.com/*"],
-      "js": ["src/settings.js", "src/editor.js", "src/content.js"],
+      "js": ["src/settings.js", "src/editor.js", "src/chat-export.js", "src/content.js"],
       "run_at": "document_idle"
     }
   ],

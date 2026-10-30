@@ -9,7 +9,7 @@ const root = path.resolve(__dirname, '..');
 const runtimeFiles = [
   'manifest.json',
   'icons/icon16.png', 'icons/icon32.png', 'icons/icon48.png', 'icons/icon128.png',
-  'src/settings.js', 'src/editor.js', 'src/content.js', 'src/styles.css',
+  'src/settings.js', 'src/editor.js', 'src/chat-export.js', 'src/content.js', 'src/styles.css',
   'src/background.js', 'src/llama-api.js', 'src/prompt-template.js',
   'src/options.html', 'src/options.js', 'src/options.css',
   'src/popup.html', 'src/popup.js', 'src/popup.css',
