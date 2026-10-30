@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Composite Extension",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -9,7 +9,7 @@
     "128": "icons/icon128.png"
   },
   "minimum_chrome_version": "111",
-  "description": "Block Google ads across websites, hide Yahoo Mail clutter, and block unwanted Pirate Bay navigation.",
+  "description": "Hide ads with CSS across websites, hide Yahoo Mail clutter, and block unwanted Pirate Bay navigation.",
   "permissions": ["declarativeNetRequest"],
   "action": {
     "default_title": "Composite Extension",
@@ -31,7 +31,6 @@
     {
       "matches": ["http://*/*", "https://*/*"],
       "css": ["src/google-ads.css", "src/billboards.css"],
-      "js": ["src/google-ads.js"],
       "all_frames": true,
       "match_about_blank": true,
       "run_at": "document_start"
@@ -59,8 +58,7 @@
   ],
   "declarative_net_request": {
     "rule_resources": [
-      {"id": "piratebay_blocker", "enabled": true, "path": "rules/piratebay.json"},
-      {"id": "google_ads", "enabled": true, "path": "rules/google-ads.json"}
+      {"id": "piratebay_blocker", "enabled": true, "path": "rules/piratebay.json"}
     ]
   }
 }

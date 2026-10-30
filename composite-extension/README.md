@@ -9,11 +9,13 @@ Standalone Chrome Manifest V3 extension, following the existing prompt-enhancer 
 3. Click **Load unpacked** and select `C:\llama.cpp\composite-extension`.
 4. Refresh existing Yahoo Mail and Pirate Bay tabs. Pin the extension to view its rule summary.
 
-## Google ads on all websites (0.2.0)
+## Cosmetic ad hiding on all websites (0.3.0)
 
-On HTTP/HTTPS pages, including matching embedded frames, CSS immediately hides common Google ad containers and a local script removes them. This includes the supplied `ins.adsbygoogle.adsbygoogle-noablate` fixed banner and its entire contents. Newly inserted ads and elements that acquire ad markers are handled automatically.
+On HTTP/HTTPS pages, including matching embedded frames, CSS hides common Google ad containers with `display: none !important`. Elements stay in the DOM. This includes the supplied `ins.adsbygoogle.adsbygoogle-noablate` fixed banner and its entire contents. CSS also applies to newly inserted elements.
 
-Network rules block embedded requests to `doubleclick.net`, `googlesyndication.com`, `googleadservices.com`, `googletagservices.com` and `google.com/pagead/`. Ordinary top-level navigation is excluded. No general Google, Google Fonts, Google APIs or Tag Manager domain block is added.
+Google advertising network rules and the DOM-removal script were removed in 0.3.0. Ad requests and scripts are allowed to load, including tracking and cookie syncing. Only the separate Pirate Bay unwanted-navigation blocker retains network blocking. Reload the extension and refresh pages to discard the previous removal script and reload previously blocked resources.
+
+Cosmetic hiding cannot guarantee identical site behavior: hidden elements have no layout size, so size-sensitive or lazy-loaded ads may behave differently. Server/CORS errors, document.write warnings and blocking by other extensions may remain. This extension no longer generates network blocks for Google advertising requests.
 
 Reload the extension and refresh open pages after upgrading. Chrome may request access to all websites; allow that access for global ad removal. Chrome's protected pages (such as chrome:// pages and the Web Store) do not allow these content scripts. Incognito requires separately enabling the extension there.
 
@@ -31,7 +33,7 @@ The previous Informer footer rule now applies globally: it hides the entire AdOc
 
 RTS calls `Cookies.get('promo_seen')` and `Cookies.set(...)` in its mobile app promotion code. A bundled js-cookie 3.0.5 fallback runs only on https://www.rts.rs/ and https://rts.rs/, before page scripts, and only if `Cookies` is undefined. It preserves an existing implementation and does not read or write cookies at initialization. The site's own calls retain their normal behavior; no consent or promo value is fabricated. Source: https://www.npmjs.com/package/js-cookie/v/3.0.5 (MIT license bundled in src/vendor/js-cookie-LICENSE.txt). No library is downloaded at runtime.
 
-Blocked ad requests can still produce `ERR_BLOCKED_BY_CLIENT` messages. Browser document.write, preload and unsupported-feature warnings are not suppressed. This fallback does not establish the cause of any persistent loading indicator.
+Browser document.write, preload and unsupported-feature warnings are not suppressed. This fallback does not establish the cause of any persistent loading indicator.
 
 ## Yahoo Mail rules
 
@@ -54,11 +56,11 @@ Limitations: an indirectly created popup can still leave a blank or Chrome-block
 
 ## Privacy and permissions
 
-The `declarativeNetRequest` permission is used for Chrome's built-in blocking rules. Google ad cleanup runs on all HTTP/HTTPS sites; Yahoo and Pirate Bay scripts remain limited to their respective sites. No analytics, external services, saved browsing history, email capture or remote code.
+The `declarativeNetRequest` permission is used only for the Pirate Bay unwanted-navigation rule. Ad-hiding CSS runs on all HTTP/HTTPS sites; Yahoo, RTS and Pirate Bay features remain limited to their respective sites. The extension has no analytics, external services, saved browsing history, email capture or remote code. Websites' own advertising and tracking requests are allowed.
 
 ## Verify
 
-Run `node --test composite-extension/tests/guard.test.cjs` from `C:\llama.cpp`.
+Run `node --test composite-extension/tests/*.test.cjs` from `C:\llama.cpp`.
 
 After loading in Chrome, check the extension's Errors panel, then verify the two Yahoo targets disappear on initial load and after mailbox navigation. Confirm ordinary messages remain visible. On Pirate Bay, confirm direct links/popups to the blocked domain do not open and normal links still work. Check network-blocked navigations in DevTools. Actual live-site behavior requires verification in your browser.
 
