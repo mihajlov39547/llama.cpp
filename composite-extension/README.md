@@ -27,7 +27,13 @@ Any container labeled `data-placeholder-caption="Oglas"` that contains `.wrapper
 
 The previous Informer footer rule now applies globally: it hides the entire AdOcean footer billboard, including its translucent background, using the `billboard` ID prefix and AdOcean close-control class. Randomized suffixes do not matter. CSS also applies to banners inserted later. These are cosmetic rules; they do not block AdOcean network requests or hide every generic element named banner.
 
-## Yahoo Mail
+## RTS compatibility (0.2.4)
+
+RTS calls `Cookies.get('promo_seen')` and `Cookies.set(...)` in its mobile app promotion code. A bundled js-cookie 3.0.5 fallback runs only on https://www.rts.rs/ and https://rts.rs/, before page scripts, and only if `Cookies` is undefined. It preserves an existing implementation and does not read or write cookies at initialization. The site's own calls retain their normal behavior; no consent or promo value is fabricated. Source: https://www.npmjs.com/package/js-cookie/v/3.0.5 (MIT license bundled in src/vendor/js-cookie-LICENSE.txt). No library is downloaded at runtime.
+
+Blocked ad requests can still produce `ERR_BLOCKED_BY_CLIENT` messages. Browser document.write, preload and unsupported-feature warnings are not suppressed. This fallback does not establish the cause of any persistent loading indicator.
+
+## Yahoo Mail rules
 
 On `https://mail.yahoo.com/*`, `src/yahoo-mail.css` hides:
 
