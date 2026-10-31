@@ -153,7 +153,7 @@ test('popup watchdog ignores late status after a new check', async () => {
 test('runtime allowlist creates a valid reproducible ZIP with every manifest/page dependency', () => {
   const files = new Map(runtimeFiles.map(name => [name, fs.readFileSync(path.join(__dirname, '..', name))]));
   const manifest = validateReferences(files);
-  assert.equal(manifest.version, '0.4.1');
+  assert.equal(manifest.version, '0.5.0');
   assert.deepEqual(manifest.permissions, ['storage', 'clipboardWrite']);
   const zip = buildZip(files), unpacked = validateZip(zip);
   assert.ok(zip.equals(buildZip(files)));

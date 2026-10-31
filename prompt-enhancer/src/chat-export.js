@@ -30,6 +30,7 @@
       const children = () => [...node.childNodes].map(read).join('');
       if (tag === 'BR') return plain ? '\n' : '  \n';
       if (tag === 'PRE') {
+        if (first(node, 'svg') && !first(node, 'code')) return '\n\n> Diagram: see the companion HTML report.\n\n';
         const code = first(node, 'code') || node;
         const text = raw(code).replace(/\r\n?/g, '\n');
         const longest = Math.max(0, ...(text.match(/`+/g) || []).map(run => run.length));
@@ -85,6 +86,62 @@
     }
     // Do not normalize internal whitespace: code, paths and user line breaks matter.
     return read(root).replace(/\r\n?/g, '\n').trim();
+  }
+
+  // Report cards are separate documents and may be absent from conversation JSON.
+  // Capture only report-page nodes inside the current transcript, never unrelated panels.
+  function reports(root = conversationRoot()) {
+    const groups = new Map();
+    const pages = [...root.querySelectorAll('[class]')].filter(node =>
+      (attr(node, 'class') || '').split(/\s+/).some(name => /^_reportPage_/.test(name)) &&
+      !node.closest('[hidden], [aria-hidden="true"], [inert]'));
+    for (const page of pages) {
+      let card = page;
+      for (let parent = page.parentElement; parent && parent !== root; parent = parent.parentElement) {
+        if (parent.querySelectorAll('button[aria-label="Export"]').length) { card = parent; break; }
+      }
+      if (!groups.has(card)) groups.set(card, []);
+      groups.get(card).push(page);
+    }
+    const escapeHTML = text => String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+    const htmlTags = new Set('div span p h1 h2 h3 h4 h5 h6 strong b em i s del pre code blockquote ul ol li table thead tbody tfoot tr th td br hr sup sub a'.split(' '));
+    const svgTags = new Set('svg g path rect circle ellipse line polyline polygon text tspan defs marker foreignobject'.split(' '));
+    const svgAttrs = ['id', 'viewBox', 'width', 'height', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'cx', 'cy', 'r', 'rx', 'ry', 'd', 'points', 'transform', 'fill', 'stroke', 'stroke-width', 'text-anchor', 'markerWidth', 'markerHeight', 'markerUnits', 'refX', 'refY', 'orient', 'marker-start', 'marker-end'];
+    function clean(node) {
+      if (node.nodeType === 3) return escapeHTML(node.nodeValue);
+      if (node.nodeType !== 1 || node.hidden || attr(node, 'aria-hidden') === 'true') return '';
+      const tag = node.tagName.toLowerCase();
+      if (['script', 'style', 'button', 'iframe', 'object', 'embed', 'input', 'textarea', 'link', 'meta', 'use', 'image', 'img'].includes(tag)) return '';
+      const children = [...node.childNodes].map(clean).join('');
+      if (!htmlTags.has(tag) && !svgTags.has(tag)) return children;
+      let attrs = '';
+      if (svgTags.has(tag)) {
+        for (const key of svgAttrs) {
+          const value = attr(node, key);
+          if (value === null || value === undefined) continue;
+          if (/url\(/i.test(value) && !/^url\(#[\w:.-]+\)$/.test(value)) continue;
+          if (/[<>]/.test(value)) continue;
+          attrs += ` ${key}="${escapeHTML(value)}"`;
+        }
+      }
+      if (tag === 'a') {
+        const href = safeURL(attr(node, 'href'));
+        if (href) attrs += ` href="${escapeHTML(href)}" rel="noreferrer"`;
+      }
+      const outputTag = tag === 'foreignobject' ? 'foreignObject' : tag;
+      return `<${outputTag}${attrs}>${children}</${outputTag}>`;
+    }
+    const seenReports = new Set(), result = [];
+    for (const reportPages of groups.values()) {
+      const title = first(reportPages[0], 'h1')?.textContent?.trim() || 'Research report';
+      const body = reportPages.map(clean).join('\n');
+      if (seenReports.has(body)) continue;
+      seenReports.add(body);
+      const note = 'Snapshot of report pages loaded in the conversation at export time. Open/expand the report and load all pages before exporting. Citation numbers without URLs and already-rendered formulas cannot be reconstructed from the page.';
+      const text = reportPages.map(page => markdown(page)).join('\n\n');
+      result.push({ title, markdown: `> ${note}\n\n${text}\n`, html: `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'none'; base-uri 'none'; form-action 'none'"><title>${escapeHTML(title)}</title><style>body{max-width:1000px;margin:32px auto;padding:0 20px;font:16px/1.6 system-ui;color:#222;background:white}table{border-collapse:collapse}td,th{border:1px solid #bbb;padding:8px}pre{overflow:auto;white-space:pre-wrap}svg{max-width:100%;height:auto}svg rect,svg polygon{fill:#ececff;stroke:#9370db}svg path{stroke:#444}svg foreignObject div{text-align:center}svg p{margin:0}aside{padding:12px;background:#eee}</style></head><body><aside>${escapeHTML(note)}</aside>${body}</body></html>` });
+    }
+    return result;
   }
 
   function conversationRoot() {
@@ -194,6 +251,7 @@
 
   async function exportChat({ signal, progress = () => {} } = {}) {
     const route = location.href, meta = metadata();
+    const loadedReports = reports();
     // Never guess the most recent chat when a local/temporary chat has no URL ID.
     const id = new URL(route).pathname.match(/\/c\/([a-zA-Z0-9-]+)(?:\/|$)/)?.[1];
     if (!id) throw new Error('Open a saved conversation before exporting. Temporary and shared chats are not supported.');
@@ -355,15 +413,23 @@
     if (!messages.length) throw new Error('No exportable chat messages found.');
     meta.title = data.title || meta.title;
     const name = filename(meta.title);
+    const reportLinks = [];
+    for (const [index, report] of loadedReports.entries()) {
+      const base = `export-files/report-${String(index + 1).padStart(3, '0')}`;
+      files.set(base + '.md', report.markdown);
+      files.set(base + '.html', report.html);
+      reportLinks.push(`- ${escapeText(report.title)}: [Markdown](${base}.md) | [HTML with diagrams](${base}.html)`);
+    }
     const md = `# ${escapeText(meta.title)}\n\nSource: <${safeURL(meta.url)}>\n\n` +
       '> Saved conversation branch. Other branches and internal reasoning are excluded.\n\n' +
       (warnings.length ? `> Export has ${warnings.length} warning(s); see export-report.txt.\n\n` : '') +
-      messages.map(item => `## ${item.role === 'user' ? 'You' : 'ChatGPT'}\n\n${item.text}`).join('\n\n---\n\n') + '\n';
+      messages.map(item => `## ${item.role === 'user' ? 'You' : 'ChatGPT'}\n\n${item.text}`).join('\n\n---\n\n') + '\n' +
+      (reportLinks.length ? '\n## Loaded research reports\n\n' + reportLinks.join('\n') + '\n' : '');
     check();
-    if (imageCount || warnings.length) {
+    if (imageCount || warnings.length || loadedReports.length) {
       files.set(name, md);
       if (warnings.length) files.set('export-report.txt', warnings.join('\n'));
-      return { filename: name.replace(/\.md$/, '.zip'), blob: archive(files), markdown: md, count: messages.length, scanned: true, warnings: warnings.length, imageCount: files.size - 1 - (warnings.length ? 1 : 0) };
+      return { filename: name.replace(/\.md$/, '.zip'), blob: archive(files), markdown: md, count: messages.length, scanned: true, warnings: warnings.length, reportCount: loadedReports.length, imageCount: [...files.keys()].filter(path => /^export-files\/image-/.test(path)).length };
     }
     return { filename: name, markdown: md, count: messages.length, scanned: true, warnings: 0, imageCount: 0 };
   }
@@ -378,5 +444,5 @@
     try { link.click(); }
     finally { link.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000); }
   }
-  globalThis.PromptEnhancerExport = { markdown, collect, metadata, filename, documentMarkdown, branch, archive, exportChat, download };
+  globalThis.PromptEnhancerExport = { markdown, collect, metadata, filename, documentMarkdown, reports, branch, archive, exportChat, download };
 })();

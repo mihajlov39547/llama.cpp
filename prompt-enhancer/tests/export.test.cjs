@@ -275,3 +275,40 @@ test('unsupported partial content is reported while content.text and readable pa
   const zipText = Buffer.from(await result.blob.arrayBuffer()).toString('utf8');
   assert.match(zipText, /id=a, type=text.*unsupported content part/);
 });
+
+
+test('research report cards export separate Markdown and inert HTML with diagrams', async () => {
+  const f = fixture(), e = f.element;
+  const card = e('div', {}, e('button', { 'aria-label': 'Export' }, 'Export'));
+  card.append(e('div', { class: '_reportPage_16ou1_1' }, e('h1', {}, 'IoU and IoA'),
+    e('p', {}, 'Research summary ', e('strong', {}, 'containment'), e('sup', { 'data-citation-index': '1' }, '1')),
+    e('table', {}, e('tr', {}, e('th', {}, 'Metric')), e('tr', {}, e('td', {}, 'IoA'))),
+    e('svg', { viewBox: '0 0 100 50', onload: 'BAD()' }, e('path', { d: 'M0 0L10 10', fill: 'url(https://tracker.example/a)' }), e('text', {}, 'Diagram')),
+    e('script', {}, 'BAD_SCRIPT'), e('iframe', { src: 'https://tracker.example' }),
+    e('a', { href: 'javascript:BAD()' }, 'Unsafe link')));
+  card.append(e('div', { class: '_reportPage_16ou1_1' }, e('h2', {}, 'Conclusion'), e('p', {}, 'End of report')));
+  f.root.append(card);
+  const reports = f.api.reports();
+  assert.equal(reports.length, 1);
+  assert.match(reports[0].markdown, /Research summary/);
+  assert.match(reports[0].markdown, /End of report/);
+  assert.match(reports[0].html, /<svg viewBox="0 0 100 50">/);
+  assert.match(reports[0].html, /Content-Security-Policy/);
+  assert.doesNotMatch(reports[0].html, /BAD|onload|tracker.example|<iframe|<button|javascript:/);
+  mockAPI(f, { mapping: { a: message('a', 'user', 'Research question', null) }, current_node: 'a' });
+  const result = await f.api.exportChat();
+  assert.equal(result.reportCount, 1);
+  assert.equal(result.imageCount, 0);
+  assert.match(result.filename, /\.zip$/);
+  assert.match(result.markdown, /report-001.html/);
+  const zip = Buffer.from(await result.blob.arrayBuffer()).toString('utf8');
+  assert.match(zip, /export-files\/report-001.md/);
+  assert.match(zip, /End of report/);
+});
+
+test('report collection excludes hidden cards and report pages outside the transcript', () => {
+  const f = fixture(), e = f.element;
+  f.document.body.append(e('div', { class: '_reportPage_other' }, e('h1', {}, 'Other chat')));
+  f.root.append(e('div', { hidden: '' }, e('div', { class: '_reportPage_hidden' }, e('h1', {}, 'Hidden'))));
+  assert.equal(f.api.reports().length, 0);
+});

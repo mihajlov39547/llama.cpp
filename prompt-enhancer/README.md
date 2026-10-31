@@ -1,6 +1,6 @@
 # Local Prompt Enhancer
 
-Version 0.4.1 labels non-image attachments, skips empty text messages, deduplicates image reference schemes, and identifies failed assets by message ID, filename and source. Reload the unpacked extension and refresh ChatGPT after updating.
+Version 0.5.0 labels non-image attachments, skips empty text messages, deduplicates image reference schemes, and identifies failed assets by message ID, filename and source. Reload the unpacked extension and refresh ChatGPT after updating.
 
 ## Export a chat as Markdown
 
@@ -203,6 +203,13 @@ node scripts/build-release.cjs
 node scripts/build-release.cjs --check
 ```
 
-Output: `release/local-prompt-enhancer-0.4.1.zip`. It includes 21 allowlisted runtime files, with `manifest.json` at the root. The validator checks archive integrity, current source bytes, icons and manifest/HTML/worker references. Tests, docs, source artwork, model files, secrets and existing archives are excluded.
+Output: `release/local-prompt-enhancer-0.5.0.zip`. It includes 21 allowlisted runtime files, with `manifest.json` at the root. The validator checks archive integrity, current source bytes, icons and manifest/HTML/worker references. Tests, docs, source artwork, model files, secrets and existing archives are excluded.
 
 Read `RELEASE_CHECKLIST.md`, `PRIVACY_POLICY.md`, `docs/PERMISSIONS.md`, `docs/POLICY_REVIEW.md`, `store/LISTING.md` and `store/SCREENSHOTS.md` before publishing. Hosted URLs, publisher/contact details, real Chrome acceptance, the clipboard permission comparison, real screenshots and promotional graphics still require publisher work. No store upload or submission has been made.
+
+
+## Deep research report cards (0.5.0)
+
+Before Export chat, scroll to the research report and let its pages load inside the conversation. A document shown only in a separate side panel is not captured. The exporter snapshots report-page elements currently present inside the conversation. ZIP includes `export-files/report-001.md` and `report-001.html`, with links under Loaded research reports in the main Markdown. Multiple loaded reports are supported; identical rendered copies are deduplicated. The HTML is a static, sanitized document with no scripts or remote resource loading; it preserves inline SVG diagrams. The Markdown contains rendered text and tables, not the original report source. Use the HTML for diagrams.
+
+This does not invoke ChatGPT's Export menu or its private report download API. Reports absent from the loaded DOM and unloaded pages cannot be captured; it is not a guarantee of complete report retrieval. Citation numbers without link destinations, original Mermaid source, and formulas already misrendered by ChatGPT cannot be recovered from this snapshot. Report files explicitly state this limitation. No new permissions or network requests are needed for report capture.

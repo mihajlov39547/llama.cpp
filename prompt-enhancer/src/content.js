@@ -46,7 +46,7 @@
   const improve = button('✦ Improve Prompt', bar, () => start('improve'));
   improve.dataset.promptEnhancerButton = '';
   const exportButton = button('Export chat', bar, exportConversation);
-  exportButton.title = 'Save the conversation as Markdown, with images in a ZIP folder when present.';
+  exportButton.title = 'Save the conversation, images and loaded research report cards. Scroll to report cards before exporting.';
   const exportStatus = element('span', '', bar, { class: 'export-status', role: 'status', 'aria-live': 'polite' });
   let exportController = null;
   let editor = null, route = location.href, snapshot = null, rewrite = '';
@@ -108,7 +108,7 @@
       });
       if (controller.signal.aborted || disposed) return;
       globalThis.PromptEnhancerExport.download(result);
-      exportStatus.textContent = `Download started: ${result.filename} (${result.count} messages, ${result.imageCount || 0} images${result.warnings ? `, ${result.warnings} warnings: see export-report.txt` : ''}).`;
+      exportStatus.textContent = `Download started: ${result.filename} (${result.count} messages, ${result.imageCount || 0} images, ${result.reportCount || 0} reports${result.warnings ? `, ${result.warnings} warnings: see export-report.txt` : ''}).`;
     } catch (error) {
       if (!disposed) exportStatus.textContent = error.message;
     } finally {
