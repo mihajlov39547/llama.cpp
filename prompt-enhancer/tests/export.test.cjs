@@ -306,9 +306,54 @@ test('research report cards export separate Markdown and inert HTML with diagram
   assert.match(zip, /End of report/);
 });
 
-test('report collection excludes hidden cards and report pages outside the transcript', () => {
+test('report collection includes portal reports but excludes hidden cards', () => {
   const f = fixture(), e = f.element;
-  f.document.body.append(e('div', { class: '_reportPage_other' }, e('h1', {}, 'Other chat')));
+  f.document.body.append(e('div', { class: '_reportPage_other' }, e('h1', {}, 'Open report panel')));
   f.root.append(e('div', { hidden: '' }, e('div', { class: '_reportPage_hidden' }, e('h1', {}, 'Hidden'))));
-  assert.equal(f.api.reports().length, 0);
+  assert.equal(f.api.reports().length, 1);
+  assert.equal(f.api.reports()[0].title, 'Open report panel');
+});
+
+
+test('research report omitted by virtualization is collected during scan and scroll restored', async () => {
+  const f = fixture(), e = f.element;
+  const scroller = e('div', { 'data-app-action-timeline-scroll': '' });
+  f.document.body.append(scroller); scroller.append(f.root);
+  scroller.clientHeight = 200; scroller.scrollHeight = 600; scroller.scrollTop = 400;
+  scroller.style.scrollBehavior = 'smooth';
+  mockAPI(f, { mapping: { a: message('a', 'user', '@Deep research review literature', null) }, current_node: 'a' });
+  const result = await f.api.exportChat({ wait: async () => {
+    f.root.textContent = '';
+    if (scroller.scrollTop < 200) f.root.append(e('div', { class: '_reportPage_test' }, e('h1', {}, 'Research'), e('p', {}, 'Recovered report')));
+  } });
+  assert.equal(result.reportCount, 1);
+  assert.equal(scroller.scrollTop, 400);
+  assert.equal(scroller.style.scrollBehavior, 'smooth');
+  assert.match(Buffer.from(await result.blob.arrayBuffer()).toString(), /Recovered report/);
+});
+
+test('missing deep research report is explicit rather than a silently successful plain export', async () => {
+  const f = fixture();
+  mockAPI(f, { mapping: { a: message('a', 'user', '@Deep research review literature', null) }, current_node: 'a' });
+  const result = await f.api.exportChat();
+  assert.equal(result.warnings, 1);
+  assert.equal(result.reportCount, 0);
+  assert.match(Buffer.from(await result.blob.arrayBuffer()).toString(), /report is NOT included/);
+});
+
+
+test('research discovery traverses readable frames and open shadows and reports blocked frames', () => {
+  const f = fixture(), e = f.element, diagnostics = {};
+  const frameDOM = dom();
+  frameDOM.document.body.append(frameDOM.element('div', { class: '_reportPage_frame' }, frameDOM.element('h1', {}, 'Frame report')));
+  const frame = e('iframe'); frame.contentDocument = frameDOM.document;
+  const blocked = e('iframe'); Object.defineProperty(blocked, 'contentDocument', { get() { throw new Error('SecurityError'); } });
+  const host = e('div'); host.shadowRoot = e('div', {}, e('div', { 'data-report-page': '' }, e('h1', {}, 'Shadow report')));
+  f.document.body.append(frame, blocked, host);
+  const result = f.api.reports(f.document, diagnostics);
+  assert.equal(result.length, 2);
+  assert.equal(diagnostics.readableFrames, 1);
+  assert.equal(diagnostics.inaccessibleFrames, 1);
+  assert.equal(diagnostics.openShadowRoots, 1);
+  assert.equal(diagnostics.reportPages, 2);
 });

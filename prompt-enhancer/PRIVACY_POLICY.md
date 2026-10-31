@@ -1,6 +1,6 @@
 # Local Prompt Enhancer — Privacy Policy
 
-Version 0.5.0 · Last updated 30 October 2026
+Version 0.5.2 · Last updated 30 October 2026
 
 Publisher/contact: **[PUBLISHER NAME AND PRIVACY CONTACT — complete before publication]**
 
@@ -51,4 +51,4 @@ Do not click Improve Prompt or Refine Further if you do not want that text sent 
 Before publication, the publisher must replace the contact placeholder above and host this policy at a publicly accessible HTTPS URL, linked from the store listing and project homepage. Privacy questions can then be directed to that contact.
 
 
-Research report export additionally reads report pages currently loaded inside the conversation after a trusted Export click. It includes sanitized static HTML and rendered Markdown in the local ZIP. These can contain report text, citations and inline diagrams. Report snapshots are not stored in extension storage or sent to the local model or developer services.
+Research report export additionally reads report pages currently loaded on the ChatGPT page after a trusted Export click. It includes sanitized static HTML and rendered Markdown in the local ZIP. These can contain report text, citations and inline diagrams. Report snapshots are not stored in extension storage or sent to the local model or developer services.

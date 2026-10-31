@@ -89,12 +89,29 @@
   }
 
   // Report cards are separate documents and may be absent from conversation JSON.
-  // Capture only report-page nodes inside the current transcript, never unrelated panels.
-  function reports(root = conversationRoot()) {
-    const groups = new Map();
-    const pages = [...root.querySelectorAll('[class]')].filter(node =>
-      (attr(node, 'class') || '').split(/\s+/).some(name => /^_reportPage_/.test(name)) &&
-      !node.closest('[hidden], [aria-hidden="true"], [inert]'));
+  // Report documents may be rendered in a portal outside the transcript.
+  function reports(root = document, diagnostics = {}) {
+    const groups = new Map(), pages = [], visited = new Set();
+    Object.assign(diagnostics, { roots: 0, reportPages: 0, readableFrames: 0, inaccessibleFrames: 0, openShadowRoots: 0 });
+    function walk(scope) {
+      if (!scope || visited.has(scope)) return;
+      visited.add(scope); diagnostics.roots++;
+      for (const node of scope.querySelectorAll('*')) {
+        if (node.closest('[hidden], [aria-hidden="true"], [inert], [data-prompt-enhancer-host]')) continue;
+        const classes = (attr(node, 'class') || '').split(/\s+/);
+        if (classes.some(name => /(?:^|_)reportPage(?:_|$)/.test(name)) || attr(node, 'data-report-page') !== null) pages.push(node);
+        if (node.shadowRoot) { diagnostics.openShadowRoots++; walk(node.shadowRoot); }
+        if (node.tagName?.toLowerCase() === 'iframe') {
+          try {
+            const frameDocument = node.contentDocument;
+            if (frameDocument?.documentElement) { diagnostics.readableFrames++; walk(frameDocument); }
+            else diagnostics.inaccessibleFrames++;
+          } catch { diagnostics.inaccessibleFrames++; }
+        }
+      }
+    }
+    walk(root);
+    diagnostics.reportPages = pages.length;
     for (const page of pages) {
       let card = page;
       for (let parent = page.parentElement; parent && parent !== root; parent = parent.parentElement) {
@@ -249,9 +266,18 @@
     return new Blob([...parts, ...directory, end], { type: 'application/zip' });
   }
 
-  async function exportChat({ signal, progress = () => {} } = {}) {
+  async function exportChat({ signal, progress = () => {}, wait = ms => new Promise(resolve => setTimeout(resolve, ms)) } = {}) {
     const route = location.href, meta = metadata();
-    const loadedReports = reports();
+    const reportDiagnostics = {};
+    const loadedReports = reports(document, reportDiagnostics);
+    function captureReports() {
+      for (const report of reports(document, reportDiagnostics)) {
+        const existing = loadedReports.findIndex(item => item.title === report.title &&
+          (item.markdown.includes(report.markdown.split('\n\n').slice(1).join('\n\n')) || report.markdown.includes(item.markdown.split('\n\n').slice(1).join('\n\n'))));
+        if (existing < 0) loadedReports.push(report);
+        else if (report.markdown.length > loadedReports[existing].markdown.length) loadedReports[existing] = report;
+      }
+    }
     // Never guess the most recent chat when a local/temporary chat has no URL ID.
     const id = new URL(route).pathname.match(/\/c\/([a-zA-Z0-9-]+)(?:\/|$)/)?.[1];
     if (!id) throw new Error('Open a saved conversation before exporting. Temporary and shared chats are not supported.');
@@ -322,6 +348,37 @@
       data.page_info = { has_previous_page: false, has_next_page: false };
     }
     const ordered = branch(data), files = new Map(), images = new Map(), warnings = [], messages = [], seen = new Set();
+    // A report may have disappeared from the DOM when the user scrolled to
+    // the composer. Revisit the transcript only for an explicit research request.
+    const expectsReport = ordered.some(message => message.author?.role === 'user' &&
+      (message.content?.parts || []).some(part => typeof part === 'string' && /@Deep research\b/i.test(part)));
+    captureReports();
+    if (expectsReport && !loadedReports.length) {
+      const root = conversationRoot();
+      let scroller = root.closest('[data-app-action-timeline-scroll], .thread-scroll-container');
+      if (!scroller) {
+        for (let node = root; node && node !== document.body; node = node.parentElement) {
+          if (node.scrollHeight > node.clientHeight + 10 && /auto|scroll/.test(getComputedStyle(node).overflowY)) { scroller = node; break; }
+        }
+      }
+      scroller ||= document.scrollingElement;
+      if (scroller?.clientHeight > 0 && scroller.scrollHeight > scroller.clientHeight) {
+        const oldTop = scroller.scrollTop, oldBehavior = scroller.style.scrollBehavior;
+        try {
+          scroller.style.scrollBehavior = 'auto';
+          scroller.scrollTop = 0;
+          for (let step = 0; step < 100; step++) {
+            await wait(step === 0 ? 700 : 250); check(); captureReports();
+            if (scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 3) break;
+            scroller.scrollTop = Math.min(scroller.scrollTop + Math.max(100, scroller.clientHeight * 0.7), scroller.scrollHeight - scroller.clientHeight);
+          }
+        } finally {
+          if (location.href === route && scroller.isConnected) scroller.scrollTop = oldTop;
+          scroller.style.scrollBehavior = oldBehavior;
+        }
+      }
+      if (!loadedReports.length) warnings.push('A Deep research request was found, but no loaded report document was captured. Open the report with Expand, keep it open and export again. The report is NOT included; see report-diagnostics.json for document/frame discovery counts. The conversation alone is not a complete research export.');
+    }
     let imageCount = 0, bytesTotal = 0;
     const assetId = pointer => typeof pointer === 'string' ? pointer.replace(/^(?:sediment|file-service):\/\//, '') : '';
     const reportLabel = value => String(value || 'unknown').replace(/[\r\n\t]/g, ' ').slice(0, 200);
@@ -413,6 +470,7 @@
     if (!messages.length) throw new Error('No exportable chat messages found.');
     meta.title = data.title || meta.title;
     const name = filename(meta.title);
+    captureReports();
     const reportLinks = [];
     for (const [index, report] of loadedReports.entries()) {
       const base = `export-files/report-${String(index + 1).padStart(3, '0')}`;
@@ -426,6 +484,10 @@
       messages.map(item => `## ${item.role === 'user' ? 'You' : 'ChatGPT'}\n\n${item.text}`).join('\n\n---\n\n') + '\n' +
       (reportLinks.length ? '\n## Loaded research reports\n\n' + reportLinks.join('\n') + '\n' : '');
     check();
+    if (expectsReport && !loadedReports.length) {
+      files.set('report-diagnostics.json', JSON.stringify({ exporterVersion: '0.5.2', ...reportDiagnostics,
+        note: 'Counts only; no conversation content or credentials. Inaccessible frames may be cross-origin or sandboxed. Closed shadow roots are not inspectable.' }, null, 2));
+    }
     if (imageCount || warnings.length || loadedReports.length) {
       files.set(name, md);
       if (warnings.length) files.set('export-report.txt', warnings.join('\n'));
