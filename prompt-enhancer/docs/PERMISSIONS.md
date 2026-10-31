@@ -2,7 +2,7 @@
 
 No new permission was added for the popup or setup guide.
 
-Version 0.5.2 exports Markdown and images without new permissions. A trusted click reads the saved conversation through same-origin ChatGPT requests using the current session token in memory, resolves image assets and fetches their bytes subject to browser CORS. No bearer token is sent to image hosts. Downloads use local Blobs and an anchor, not the downloads API. Export does not contact the AI server or access other tabs.
+Version 0.6.0 exports Markdown and images without new permissions. A trusted click reads the saved conversation through same-origin ChatGPT requests using the current session token in memory, resolves image assets and fetches their bytes subject to browser CORS. No bearer token is sent to image hosts. Downloads use local Blobs and an anchor, not the downloads API. Export does not contact the AI server or access other tabs.
 
 | Access | Current use | Review |
 | --- | --- | --- |

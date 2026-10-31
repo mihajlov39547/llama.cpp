@@ -92,12 +92,13 @@
   // Report documents may be rendered in a portal outside the transcript.
   function reports(root = document, diagnostics = {}) {
     const groups = new Map(), pages = [], visited = new Set();
-    Object.assign(diagnostics, { roots: 0, reportPages: 0, readableFrames: 0, inaccessibleFrames: 0, openShadowRoots: 0 });
+    Object.assign(diagnostics, { roots: 0, reportPages: 0, readableFrames: 0, inaccessibleFrames: 0, openShadowRoots: 0, researchCompletedMarkers: 0 });
     function walk(scope) {
       if (!scope || visited.has(scope)) return;
       visited.add(scope); diagnostics.roots++;
       for (const node of scope.querySelectorAll('*')) {
         if (node.closest('[hidden], [aria-hidden="true"], [inert], [data-prompt-enhancer-host]')) continue;
+        if ([...node.childNodes].some(child => child.nodeType === 3 && /Research completed in\s/i.test(child.nodeValue || ''))) diagnostics.researchCompletedMarkers++;
         const classes = (attr(node, 'class') || '').split(/\s+/);
         if (classes.some(name => /(?:^|_)reportPage(?:_|$)/.test(name)) || attr(node, 'data-report-page') !== null) pages.push(node);
         if (node.shadowRoot) { diagnostics.openShadowRoots++; walk(node.shadowRoot); }
@@ -350,9 +351,25 @@
     const ordered = branch(data), files = new Map(), images = new Map(), warnings = [], messages = [], seen = new Set();
     // A report may have disappeared from the DOM when the user scrolled to
     // the composer. Revisit the transcript only for an explicit research request.
-    const expectsReport = ordered.some(message => message.author?.role === 'user' &&
+    const expectsReport = reportDiagnostics.researchCompletedMarkers > 0 || ordered.some(message => message.author?.role === 'user' &&
       (message.content?.parts || []).some(part => typeof part === 'string' && /@Deep research\b/i.test(part)));
     captureReports();
+    if (globalThis.chrome?.runtime?.sendMessage) {
+      try {
+        const response = await Promise.race([
+          chrome.runtime.sendMessage({ type: 'PE_REPORT_FRAMES', requestId: crypto.randomUUID() }),
+          new Promise(resolve => setTimeout(() => resolve(null), 4000))
+        ]);
+        check();
+        reportDiagnostics.bridgeFrames = response?.frames?.length || 0;
+        for (const frame of response?.frames || []) {
+          for (const report of frame.reports || []) {
+            if (!loadedReports.some(item => item.markdown === report.markdown)) loadedReports.push(report);
+          }
+        }
+        if (!response?.ok) reportDiagnostics.bridgeError = 'Frame bridge unavailable; reload extension and ChatGPT.';
+      } catch { check(); reportDiagnostics.bridgeError = 'Frame bridge failed; reload extension and ChatGPT.'; }
+    }
     if (expectsReport && !loadedReports.length) {
       const root = conversationRoot();
       let scroller = root.closest('[data-app-action-timeline-scroll], .thread-scroll-container');
@@ -485,7 +502,7 @@
       (reportLinks.length ? '\n## Loaded research reports\n\n' + reportLinks.join('\n') + '\n' : '');
     check();
     if (expectsReport && !loadedReports.length) {
-      files.set('report-diagnostics.json', JSON.stringify({ exporterVersion: '0.5.2', ...reportDiagnostics,
+      files.set('report-diagnostics.json', JSON.stringify({ exporterVersion: '0.6.0', ...reportDiagnostics,
         note: 'Counts only; no conversation content or credentials. Inaccessible frames may be cross-origin or sandboxed. Closed shadow roots are not inspectable.' }, null, 2));
     }
     if (imageCount || warnings.length || loadedReports.length) {

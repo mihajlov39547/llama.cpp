@@ -1,8 +1,7 @@
-
 {
   "manifest_version": 3,
   "name": "Local Prompt Enhancer",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "description": "Improve your prompts with local AI and export ChatGPT conversations as Markdown.",
   "icons": {
     "16": "icons/icon16.png",
@@ -20,14 +19,36 @@
       "128": "icons/icon128.png"
     }
   },
-  "permissions": ["storage", "clipboardWrite"],
+  "permissions": [
+    "storage",
+    "clipboardWrite"
+  ],
   "host_permissions": [
     "http://127.0.0.1:8080/*"
   ],
   "content_scripts": [
     {
-      "matches": ["https://chatgpt.com/*"],
-      "js": ["src/settings.js", "src/editor.js", "src/chat-export.js", "src/content.js"],
+      "matches": [
+        "https://chatgpt.com/*"
+      ],
+      "js": [
+        "src/settings.js",
+        "src/editor.js",
+        "src/chat-export.js",
+        "src/content.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://cdn.platform.openai.com/deployments/dil/*",
+        "https://*.web-sandbox.oaiusercontent.com/*"
+      ],
+      "js": [
+        "src/chat-export.js",
+        "src/report-frame.js"
+      ],
+      "all_frames": true,
       "run_at": "document_idle"
     }
   ],
@@ -37,8 +58,12 @@
   "options_page": "src/options.html",
   "web_accessible_resources": [
     {
-      "resources": ["src/styles.css"],
-      "matches": ["https://chatgpt.com/*"]
+      "resources": [
+        "src/styles.css"
+      ],
+      "matches": [
+        "https://chatgpt.com/*"
+      ]
     }
   ]
 }
