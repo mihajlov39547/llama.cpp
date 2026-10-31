@@ -215,3 +215,8 @@ Before Export chat, scroll to the research report and let its pages load inside 
 This does not invoke ChatGPT's Export menu or its private report download API. Reports absent from the loaded DOM and unloaded pages cannot be captured; it is not a guarantee of complete report retrieval. Citation numbers without link destinations, original Mermaid source, and formulas already misrendered by ChatGPT cannot be recovered from this snapshot. Report files explicitly state this limitation. No new permissions or network requests are needed for report capture.
 
 Version 0.6.0 also searches open shadow roots and browser-accessible iframe documents. It does not bypass cross-origin or sandbox restrictions. Missing research reports include `report-diagnostics.json` with discovery counts only (no text, tokens, or URLs). Use the extension button **Export chat** beside Improve Prompt; the report card?s **Export** menu belongs to ChatGPT and is not controlled by this extension.
+
+
+## Cross-origin research frames (0.6.0)
+
+Packaged `report-frame.js` and the report serializer also run inside frames matching `https://cdn.platform.openai.com/deployments/dil/*` and `https://*.web-sandbox.oaiusercontent.com/*`. They do not add composer controls or read report content until an explicit Export chat request is relayed by the extension worker. Frame replies are restricted to the requesting ChatGPT tab and approved frame origins. The collector waits 1.5 seconds for frame replies; inaccessible or unresponsive frames are not a guarantee of report coverage. Reload the extension and refresh ChatGPT so newly added frame scripts load. CSP is not disabled. A visible Research completed marker can also trigger missing-report detection without the literal @Deep research prompt.

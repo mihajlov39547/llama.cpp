@@ -357,3 +357,36 @@ test('research discovery traverses readable frames and open shadows and reports 
   assert.equal(diagnostics.openShadowRoots, 1);
   assert.equal(diagnostics.reportPages, 2);
 });
+
+
+test('worker collects report frames only from allowed frames in requesting ChatGPT tab', () => {
+  let listener, finish, broadcast, response;
+  const chrome = { runtime: { id: 'extension', getURL: p => 'chrome-extension://extension/' + p,
+    onInstalled: { addListener() {} }, onMessage: { addListener(fn) { listener = fn; } } },
+    tabs: { onRemoved: { addListener() {} }, sendMessage(tab, message) { broadcast = { tab, message }; return Promise.resolve(); } } };
+  const ctx = vm.createContext({ chrome, URL, Map, importScripts() {}, setTimeout(fn) { finish = fn; }, PromptEnhancerAPI: {} });
+  vm.runInContext(read('background.js'), ctx);
+  const top = { id: 'extension', frameId: 0, url: 'https://chatgpt.com/c/test', tab: { id: 12, url: 'https://chatgpt.com/c/test' } };
+  listener({ type: 'PE_REPORT_FRAMES', requestId: 'request-1' }, top, value => { response = value; });
+  assert.equal(broadcast.tab, 12);
+  const result = { type: 'PE_REPORT_FRAME_RESULT', requestId: 'request-1', reports: [{ title: 'Report', markdown: '# Report', html: '<p>Report</p>' }] };
+  listener(result, { ...top, frameId: 2, url: 'https://evil.example/' }, () => {});
+  listener(result, { ...top, frameId: 3, url: 'https://mcp-app-test.web-sandbox.oaiusercontent.com/' }, () => {});
+  listener(result, { ...top, frameId: 4, url: 'https://mcp-app-test.web-sandbox.oaiusercontent.com/', tab: { ...top.tab, id: 13 } }, () => {});
+  finish();
+  assert.equal(response.frames.length, 1);
+  assert.equal(response.frames[0].frameId, 3);
+});
+
+test('report frame bridge reads only on extension request and ignores synthetic page messages', () => {
+  let listener, reads = 0, output;
+  const ctx = vm.createContext({ window: { top: {} }, document: {}, PromptEnhancerExport: { reports() { reads++; return []; } },
+    chrome: { runtime: { id: 'extension', onMessage: { addListener(fn) { listener = fn; } }, sendMessage(value) { output = value; return Promise.resolve(); } } } });
+  vm.runInContext(read('report-frame.js'), ctx);
+  assert.equal(reads, 0);
+  listener({ type: 'PE_REPORT_FRAME_COLLECT', requestId: 'r' }, { id: 'other' });
+  assert.equal(reads, 0);
+  listener({ type: 'PE_REPORT_FRAME_COLLECT', requestId: 'r' }, { id: 'extension' });
+  assert.equal(reads, 1);
+  assert.equal(output.type, 'PE_REPORT_FRAME_RESULT');
+});
