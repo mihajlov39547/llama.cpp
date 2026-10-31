@@ -265,12 +265,19 @@
     }
     const ordered = branch(data), files = new Map(), images = new Map(), warnings = [], messages = [], seen = new Set();
     let imageCount = 0, bytesTotal = 0;
-    async function image(pointer) {
-      if (images.has(pointer)) return images.get(pointer);
+    const assetId = pointer => typeof pointer === 'string' ? pointer.replace(/^(?:sediment|file-service):\/\//, '') : '';
+    const reportLabel = value => String(value || 'unknown').replace(/[\r\n\t]/g, ' ').slice(0, 200);
+    let messageContext = '';
+    async function image(pointer, name = '', source = 'image content') {
+      const fileId = assetId(pointer);
+      if (images.has(fileId)) {
+        const cached = images.get(fileId);
+        if (cached.failure) warnings.push(`${messageContext}: ${cached.failure}; attachment=${reportLabel(name)}, source=${source}.`);
+        return cached.output;
+      }
       const number = ++imageCount;
-      let output;
+      let output, failure;
       try {
-        const fileId = typeof pointer === 'string' && pointer.replace(/^(?:sediment|file-service):\/\//, '');
         if (!/^file[-_][a-zA-Z0-9_-]+$/.test(fileId)) throw new Error('Unsupported image reference.');
         const info = await api(`files/download/${encodeURIComponent(fileId)}?conversation_id=${id}&inline=false`);
         const url = new URL(info.download_url);
@@ -287,12 +294,13 @@
         check();
         // Do not include expiring signed URLs or request tokens in the report.
         const reason = error.status ? `HTTP ${error.status}` : 'Image unavailable, unsupported, too large, or blocked by the browser';
-        warnings.push(`Image ${number}: ${reason}.`);
+        failure = `Image ${number}: ${reason}; asset=${reportLabel(fileId)}`;
+        warnings.push(`${messageContext}: ${failure}; attachment=${reportLabel(name)}, source=${source}.`);
         output = `> Image ${number} could not be saved. See export-report.txt.`;
       }
-      images.set(pointer, output); return output;
+      images.set(fileId, { output, failure }); return output;
     }
-    for (const message of ordered) {
+    for (const [messageIndex, message] of ordered.entries()) {
       check();
       if (message.id && seen.has(message.id)) continue;
       if (message.id) seen.add(message.id);
@@ -302,27 +310,44 @@
           ['thoughts', 'reasoning_recap', 'user_editable_context', 'model_editable_context'].includes(content.content_type) ||
           m.is_thinking_preamble_message || (role !== 'tool' && m.is_visually_hidden_from_conversation) ||
           (role === 'assistant' && message.recipient && message.recipient !== 'all')) continue;
+      messageContext = `Branch message ${messageIndex + 1} (${role}, id=${reportLabel(message.id)}, type=${reportLabel(content.content_type)})`;
       const chunks = [], attached = new Set();
+      let unsupportedPart = false;
+      const attachments = Array.isArray(m.attachments) ? m.attachments : [];
       const fallback = m.model_dil_v2?.fallbackMarkdown;
       if (role !== 'tool' && typeof fallback === 'string') chunks.push(fallback);
+      if (role !== 'tool' && !fallback && typeof content.text === 'string') chunks.push(content.text);
       for (const part of content.parts || []) {
         if (typeof part === 'string') { if (role !== 'tool' && !fallback) chunks.push(part); }
-        else if (part?.content_type === 'image_asset_pointer') { chunks.push(await image(part.asset_pointer)); attached.add(part.asset_pointer?.replace(/^(?:sediment|file-service):\/\//, '')); }
+        else if (part?.content_type === 'image_asset_pointer') {
+          const fileId = assetId(part.asset_pointer);
+          const attachment = attachments.find(item => assetId(item.id) === fileId);
+          if (!attached.has(fileId)) chunks.push(await image(part.asset_pointer, attachment?.name));
+          attached.add(fileId);
+        } else if (part != null && role !== 'tool' && !fallback) unsupportedPart = true;
       }
-      for (const attachment of m.attachments || []) {
-        if (attachment.mime_type?.startsWith('image/') && !attached.has(attachment.id)) chunks.push(await image(attachment.id));
+      for (const attachment of attachments) {
+        const fileId = assetId(attachment.id);
+        if (attached.has(fileId)) continue;
+        attached.add(fileId);
+        if (attachment.mime_type?.startsWith('image/')) {
+          chunks.push(await image(attachment.id, attachment.name, 'attachment metadata'));
+        } else {
+          chunks.push(`> Attachment: ${escapeText(reportLabel(attachment.name || attachment.id))} (${escapeText(reportLabel(attachment.mime_type || 'file'))}). File contents are not included in this export.`);
+        }
       }
       for (const item of m.aggregate_result?.messages || []) {
-        if (item.message_type === 'image') chunks.push(await image(item.image_url));
+        if (item.message_type === 'image') chunks.push(await image(item.image_url, '', 'code execution image'));
       }
       let text = chunks.join('\n\n').trim();
       for (const ref of m.content_references || []) {
         if (ref.matched_text && /[\ue200-\ue203]/.test(ref.matched_text) && typeof ref.alt === 'string')
           text = text.split(ref.matched_text).join(ref.alt);
       }
-      if (!text && role !== 'tool' && !m.is_visually_hidden_from_conversation) {
-        text = `> Unsupported message content (${content.content_type || 'unknown'}).`;
-        warnings.push('A message used an unsupported content format; its position is marked in Markdown.');
+      const knownEmpty = ['text', 'multimodal_text'].includes(content.content_type) && !unsupportedPart;
+      if ((unsupportedPart || (!text && !knownEmpty)) && role !== 'tool' && !m.is_visually_hidden_from_conversation) {
+        text += `${text ? '\n\n' : ''}> Unsupported message content (${escapeText(reportLabel(content.content_type))}). See export-report.txt.`;
+        warnings.push(`${messageContext}: unsupported content${unsupportedPart ? ' part' : ''}; readable text and attachment labels were retained.`);
       }
       if (text) messages.push({ role: role === 'user' ? 'user' : 'assistant', text });
       progress(messages.length);

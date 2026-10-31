@@ -160,7 +160,7 @@ test('uploaded and generated images are packaged once and text continues after i
     assert.match(result.markdown, /After image/);
     assert.doesNotMatch(result.markdown, /PRIVATE TOOL LOG|PRIVATE_TOKEN/);
     assert.equal(result.imageCount, success ? 1 : 0);
-    assert.equal(result.warnings, success ? 0 : 1);
+    assert.equal(result.warnings, success ? 0 : 2);
     if (success) assert.equal(result.markdown.split('export-files/image-001.png').length - 1, 2);
     const zip = Buffer.from(await result.blob.arrayBuffer());
     assert.equal(zip.readUInt32LE(0), 0x04034b50);
@@ -226,4 +226,52 @@ test('download uses a UTF-8 Markdown blob, requested filename and delayed URL cl
   assert.equal(revoked, undefined);
   cleanup();
   assert.equal(revoked, 'blob:export-test');
+});
+
+
+test('attachment-only messages retain filenames and empty text is not unsupported', async () => {
+  const f = fixture();
+  const mapping = { a: message('a', 'user', '', null), b: message('b', 'assistant', '', 'a'), c: message('c', 'assistant', 'After', 'b') };
+  mapping.a.message.metadata = { attachments: [{ id: 'file_logs', name: 'server-results.zip', mime_type: 'application/zip' }] };
+  mockAPI(f, { mapping, current_node: 'c' });
+  const result = await f.api.exportChat();
+  assert.equal(result.count, 2);
+  assert.equal(result.warnings, 0);
+  assert.match(result.markdown, /server-results.zip/);
+  assert.match(result.markdown, /File contents are not included/);
+  assert.doesNotMatch(result.markdown, /Unsupported/);
+});
+
+test('asset schemes share one download and 404 reports identify attachment and message', async () => {
+  const f = fixture();
+  const mapping = { a: message('a', 'user', 'First', null), b: message('b', 'assistant', 'Second', 'a') };
+  mapping.a.message.content.parts.push({ content_type: 'image_asset_pointer', asset_pointer: 'sediment://file_same' });
+  mapping.b.message.metadata = { attachments: [{ id: 'file_same', name: 'figure.png', mime_type: 'image/png' }] };
+  mockAPI(f, { mapping, current_node: 'b' });
+  const original = f.ctx.fetch; let calls = 0;
+  f.ctx.fetch = async (url, options) => {
+    if (url.includes('/files/download/')) { calls++; return { ok: false, status: 404 }; }
+    return original(url, options);
+  };
+  const result = await f.api.exportChat();
+  assert.equal(calls, 1);
+  const zipText = Buffer.from(await result.blob.arrayBuffer()).toString('utf8');
+  assert.match(zipText, /HTTP 404; asset=file_same/);
+  assert.match(zipText, /id=b, type=text/);
+  assert.match(zipText, /attachment=figure.png, source=attachment metadata/);
+  assert.doesNotMatch(zipText, /PRIVATE_TOKEN/);
+});
+
+test('unsupported partial content is reported while content.text and readable parts survive', async () => {
+  const f = fixture();
+  const mapping = { a: message('a', 'user', 'Readable', null), b: message('b', 'assistant', '', 'a') };
+  mapping.a.message.content.parts.push({ content_type: 'unknown_widget' });
+  mapping.b.message.content.text = 'Direct text';
+  mockAPI(f, { mapping, current_node: 'b' });
+  const result = await f.api.exportChat();
+  assert.match(result.markdown, /Readable/);
+  assert.match(result.markdown, /Direct text/);
+  assert.equal(result.warnings, 1);
+  const zipText = Buffer.from(await result.blob.arrayBuffer()).toString('utf8');
+  assert.match(zipText, /id=a, type=text.*unsupported content part/);
 });

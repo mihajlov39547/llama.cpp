@@ -1,6 +1,6 @@
 # Local Prompt Enhancer — Privacy Policy
 
-Version 0.4.0 · Last updated 30 October 2026
+Version 0.4.1 · Last updated 30 October 2026
 
 Publisher/contact: **[PUBLISHER NAME AND PRIVACY CONTACT — complete before publication]**
 

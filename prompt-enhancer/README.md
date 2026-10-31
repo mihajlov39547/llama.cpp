@@ -1,6 +1,6 @@
 # Local Prompt Enhancer
 
-Version 0.4.0 fixes incomplete virtualized-chat exports and adds image downloads. Reload the unpacked extension and refresh ChatGPT after updating.
+Version 0.4.1 labels non-image attachments, skips empty text messages, deduplicates image reference schemes, and identifies failed assets by message ID, filename and source. Reload the unpacked extension and refresh ChatGPT after updating.
 
 ## Export a chat as Markdown
 
@@ -8,7 +8,7 @@ Click **Export chat** on a saved conversation. Text-only chats download as `<cha
 
 The exporter reads the saved conversation from ChatGPT using your current signed-in session. It follows the selected branch in parent order or loads all older pages of a paginated conversation. It preserves source Markdown, including code and math, instead of scraping the virtualized screen. It excludes alternate branches, internal reasoning and tool logs. Missing branch nodes or unfinished pagination fail visibly instead of downloading a partial conversation. No AI server is required.
 
-An unavailable or unsupported image does not stop later messages: its position is marked in Markdown and `export-report.txt` explains missing assets. Image requests respect browser CORS; some expired assets or unsupported hosts cannot be downloaded. Supported downloaded formats: PNG, JPEG, WebP, GIF and AVIF. Limits: 40 MB per image, 250 MB total images, 45 seconds per request, 200 older pages. Non-image attachments, arbitrary external images, sandbox links and interactive widgets are not archived; unsupported message formats are marked. Temporary/local chats without a saved `/c/` URL and shared links are not supported.
+An unavailable or unsupported image does not stop later messages: its position is marked in Markdown and `export-report.txt` explains missing assets. Image requests respect browser CORS; some expired assets or unsupported hosts cannot be downloaded. Supported downloaded formats: PNG, JPEG, WebP, GIF and AVIF. Limits: 40 MB per image, 250 MB total images, 45 seconds per request, 200 older pages. Non-image attachment names are retained, but their bytes, arbitrary external images, sandbox links and interactive widgets are not archived; unsupported message formats are marked. Temporary/local chats without a saved `/c/` URL and shared links are not supported.
 
 Wait until the answer finishes, then export without changing branches. **Cancel export** and navigation cancel the operation. Export only runs on a trusted click. Session authentication stays in memory and is sent only to ChatGPT's own API; signed image downloads receive no bearer token. No conversation data is sent to the model or developer services, and no new extension permissions are requested. Downloads remain on your computer until deleted.
 
@@ -203,6 +203,6 @@ node scripts/build-release.cjs
 node scripts/build-release.cjs --check
 ```
 
-Output: `release/local-prompt-enhancer-0.4.0.zip`. It includes 21 allowlisted runtime files, with `manifest.json` at the root. The validator checks archive integrity, current source bytes, icons and manifest/HTML/worker references. Tests, docs, source artwork, model files, secrets and existing archives are excluded.
+Output: `release/local-prompt-enhancer-0.4.1.zip`. It includes 21 allowlisted runtime files, with `manifest.json` at the root. The validator checks archive integrity, current source bytes, icons and manifest/HTML/worker references. Tests, docs, source artwork, model files, secrets and existing archives are excluded.
 
 Read `RELEASE_CHECKLIST.md`, `PRIVACY_POLICY.md`, `docs/PERMISSIONS.md`, `docs/POLICY_REVIEW.md`, `store/LISTING.md` and `store/SCREENSHOTS.md` before publishing. Hosted URLs, publisher/contact details, real Chrome acceptance, the clipboard permission comparison, real screenshots and promotional graphics still require publisher work. No store upload or submission has been made.
