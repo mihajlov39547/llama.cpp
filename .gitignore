@@ -14,3 +14,5 @@ opencode-launcher-settings.json
 
 logs/
 bin/runtimes/
+efu-duplicates-verified/
+files.efu
