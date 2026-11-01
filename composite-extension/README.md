@@ -65,3 +65,8 @@ Run `node --test composite-extension/tests/*.test.cjs` from `C:\llama.cpp`.
 After loading in Chrome, check the extension's Errors panel, then verify the two Yahoo targets disappear on initial load and after mailbox navigation. Confirm ordinary messages remain visible. On Pirate Bay, confirm direct links/popups to the blocked domain do not open and normal links still work. Check network-blocked navigations in DevTools. Actual live-site behavior requires verification in your browser.
 
 Implementation references: [Chrome network rules](https://developer.chrome.com/docs/extensions/reference/api/declarativeNetRequest/) and [content scripts](https://developer.chrome.com/docs/extensions/reference/manifest/content-scripts).
+
+
+## Vignette overlays (0.3.1)
+
+Google vignette/interstitial `ins` wrappers are hidden as a whole. A small content script reapplies inline `display:none!important` when an ad script rewrites inline styles, including the supplied Politika Interstitial slot. It removes the exact `#google_vignette` fragment with replaceState (preserving history state, path and query) when a matching overlay exists, and restores inline overflow locks on the document/body unless a visible ordinary modal is open. Ad elements remain in the DOM and Google requests are still allowed. No extra permissions are required. Reload Composite Extension and refresh existing tabs once after upgrading.
