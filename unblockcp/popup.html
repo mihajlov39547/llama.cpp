@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="sr-Latn">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UnblockCP</title>
+<link rel="stylesheet" href="popup.css">
+<body>
+  <h1>UnblockCP <span>0.2.1</span></h1>
+  <label for="mode">Režim rada (sve stranice)</label>
+  <select id="mode">
+    <option value="strong">Široko odblokiranje</option>
+    <option value="selective">Selektivno / dijagnostika</option>
+    <option value="off">Isključeno</option>
+  </select>
+  <label><input id="css" type="checkbox"> Odblokiraj selekciju CSS-om</label>
+  <p id="status" role="status"></p>
+  <dl>
+    <dt>Ctrl + Alt + 1</dt><dd>Kopiraj selekciju</dd>
+    <dt>Ctrl + Alt + 2</dt><dd>Kopiraj sav vidljivi tekst</dd>
+    <dt>Ctrl + Alt + 3</dt><dd>Nalepi samo tekst</dd>
+    <dt>Ctrl + Alt + 4</dt><dd>Nalepi sa formatiranjem</dd>
+  </dl>
+  <p>Za paste prvo klikni u polje. Formatiranje se čuva u rich text editorima; obična polja prihvataju samo tekst.</p>
+  <p class="note">Posle instalacije osveži otvorene stranice. Prečice rade dok je stranica u fokusu. Chrome interne stranice nisu podržane.</p>
+  <details>
+    <summary>Listeneri koji otkazuju događaje</summary>
+    <p>Izaberi selektivni režim, zatvori ovaj prozor i ponovi blokiranu akciju običnom prečicom ili mišem. Zatim ovde osveži listu i isključi konkretan listener.</p>
+    <p class="note">Lista pokazuje otkazivanje, ne nameru. Legitimni editori takođe otkazuju paste. Isključivanje važi do osvežavanja stranice; svaki listener možeš vratiti.</p>
+    <div class="buttons"><button id="refresh">Osveži listu</button><button id="restore">Vrati sve listenere</button></div>
+    <div id="listeners"></div>
+  </details>
+  <script src="popup.js"></script>
+</body>
+</html>

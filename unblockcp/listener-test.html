@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="sr-Latn">
+<meta charset="utf-8">
+<title>UnblockCP — selektivni test</title>
+<style>
+  body { max-width: 850px; margin: 32px auto; font: 16px/1.6 system-ui; }
+  textarea, input, [contenteditable], iframe { display: block; width: 95%; padding: 12px; margin: 16px 0; border: 1px solid #8a9bb1; }
+  button { padding: 10px; margin: 5px; }
+</style>
+<body>
+  <h1>Selektivno odblokiranje</h1>
+  <p>U popup-u izaberi selektivni režim. Probaj akciju, pa osveži listu listenera.
+     Isključi imenovani listener i ponovi akciju. Strelice i normalno kucanje moraju nastaviti da rade.</p>
+  <p id="sample" style="user-select: none !important">Tekst za copy: <b>podebljan</b> i <i>kurziv</i>. Inline important CSS mora biti nadjačan.</p>
+  <label>Paste blokada<textarea id="pasteTarget">Selektuj ovaj tekst i nalepi novi.</textarea></label>
+  <label>Keyboard blokada<input id="keys" value="Probaj Ctrl/Meta+C, V ili A"></label>
+  <p id="counter">Ostali tasteri: 0</p>
+  <div contenteditable="true" role="textbox" aria-label="Formatirani editor">Rich text editor</div>
+  <div id="shadow"></div>
+  <button id="dynamic">Dodaj otvoreni Shadow DOM</button>
+  <button id="remove">Ukloni blockCopy originalnom referencom</button>
+  <p id="removed" role="status"></p>
+  <iframe title="Iframe test" srcdoc="<p>Tekst iz okvira</p><textarea>Paste u okviru</textarea>"></iframe>
+  <script src="listener-test.js"></script>
+</body>
+</html>

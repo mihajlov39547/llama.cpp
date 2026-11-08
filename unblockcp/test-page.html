@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="sr-Latn">
+<meta charset="utf-8">
+<title>UnblockCP — test blokada</title>
+<style>
+  body { max-width: 850px; margin: 40px auto; font: 18px/1.6 system-ui; user-select: none; }
+  input, textarea, [contenteditable], iframe { display: block; box-sizing: border-box; width: 100%; margin: 16px 0; padding: 14px; border: 1px solid #889; }
+  [contenteditable] { min-height: 130px; }
+</style>
+<body oncopy="return false" onpaste="return false" oncontextmenu="return false">
+  <h1>UnblockCP test</h1>
+  <p>Selektuj ovaj <strong>podebljani tekst</strong> i ovaj <em>kurzivni tekst</em>.
+  Ovde su uključene standardne JS i CSS zabrane.</p>
+  <label>Običan input <input value="Selektuj i zameni ovaj tekst"></label>
+  <label>Textarea <textarea rows="4">Prostor za plain text paste.</textarea></label>
+  <label>Readonly <input readonly value="Ovo mora ostati neizmenjeno."></label>
+  <div contenteditable="true" role="textbox" aria-label="Rich text editor">Ovde testiraj formatirani paste.</div>
+  <button id="add">Dodaj dinamički tekst</button>
+  <iframe title="Test iframe" srcdoc="<p>Tekst unutar iframe-a.</p><textarea placeholder='Paste u iframe'></textarea>"></iframe>
+  <script>
+    for (const type of ['copy', 'cut', 'paste', 'selectstart', 'contextmenu', 'dragstart']) {
+      window.addEventListener(type, event => event.preventDefault(), true);
+    }
+    window.addEventListener('keydown', event => {
+      if (event.ctrlKey || event.metaKey) event.preventDefault();
+    }, true);
+    document.querySelector('#add').addEventListener('click', () => {
+      const p = document.createElement('p');
+      p.textContent = 'Dinamički dodat tekst za selekciju i kopiranje.';
+      document.body.append(p);
+    });
+  </script>
+</body>
+</html>

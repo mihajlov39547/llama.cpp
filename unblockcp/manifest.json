@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "UnblockCP",
+  "version": "0.2.1",
+  "minimum_chrome_version": "119",
+  "description": "Odblokira selekciju, kopiranje i lepljenje teksta na web stranicama.",
+  "permissions": ["clipboardRead", "clipboardWrite", "storage", "scripting"],
+  "host_permissions": ["http://*/*", "https://*/*", "file:///*"],
+  "background": { "service_worker": "background.js" },
+  "action": {
+    "default_title": "UnblockCP — prečice",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [{
+    "matches": ["http://*/*", "https://*/*", "file:///*"],
+    "js": ["listener-registry.js"],
+    "world": "MAIN",
+    "run_at": "document_start",
+    "all_frames": true,
+    "match_origin_as_fallback": true
+  }, {
+    "matches": ["http://*/*", "https://*/*", "file:///*"],
+    "js": ["css-restorer.js", "content.js"],
+    "run_at": "document_start",
+    "all_frames": true,
+    "match_origin_as_fallback": true
+  }]
+}

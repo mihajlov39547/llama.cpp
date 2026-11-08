@@ -1,0 +1,16 @@
+body { width: 380px; margin: 0; padding: 22px; background: #f6f8fc; color: #182639; font: 14px/1.55 system-ui, sans-serif; }
+h1 { font-size: 23px; margin: 0 0 12px; }
+h1 span { font-size: 12px; color: #5a6b82; }
+dl { background: white; border: 1px solid #dce3ed; border-radius: 12px; padding: 14px; }
+dt { font-weight: 700; color: #174db3; }
+dd { margin: 0 0 10px; }
+dd:last-child { margin-bottom: 0; }
+.note { color: #57667b; font-size: 12px; }
+select { display: block; width: 100%; margin: 6px 0 12px; padding: 8px; }
+button { cursor: pointer; padding: 7px 10px; border: 1px solid #c1cde0; border-radius: 6px; background: white; color: #174db3; }
+button:disabled { cursor: wait; opacity: .6; }
+summary { cursor: pointer; font-weight: 600; }
+.buttons { display: flex; gap: 8px; }
+.listener { background: white; padding: 10px; border: 1px solid #dce3ed; margin-top: 8px; border-radius: 8px; overflow-wrap: anywhere; }
+.listener p { margin: 0 0 8px; }
+#status { font-size: 12px; min-height: 18px; }

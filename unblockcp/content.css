@@ -1,0 +1,6 @@
+/* Restore ordinary text selection, including dynamically inserted elements. */
+:root, :root * {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  -webkit-touch-callout: default !important;
+}
