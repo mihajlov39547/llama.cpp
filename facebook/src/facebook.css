@@ -6,6 +6,15 @@ html[data-better-facebook] {
   --input-corner-radius: 10px;
 }
 
+/* Hide the group-suggestions card using its dedicated options control.
+   The child chain includes the card wrapper, without matching feed ancestors. */
+html[data-better-facebook] div:has(
+  > div[style*="--card-corner-radius"] > div
+  > [role="button"][aria-label="More options for group suggestions"]
+) {
+  display: none !important;
+}
+
 /* Collapse the supplied cover-photo container to a transparent 20px spacer.
    Match the direct edit control so profile details outside the cover stay intact. */
 html[data-better-facebook] div:has(> [role="button"][aria-label="Edit cover photo"]) {

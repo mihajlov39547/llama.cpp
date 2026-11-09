@@ -69,6 +69,28 @@
     for (const section of matches) section.setAttribute("data-bf-profile-suggestions", "");
   }
 
+  function markSuggestedPages() {
+    const matches = new Set();
+    for (const close of document.querySelectorAll('[role="button"][aria-label="Close promotion"]')) {
+      const card = close.closest('div[style*="--card-corner-radius"]');
+      if (!card || !Array.from(card.querySelectorAll('span[dir="auto"]')).some(
+        span => span.textContent.trim() === "Suggested Pages for you"
+      )) continue;
+      let section = card;
+      if (card.parentElement?.matches("div.html-div")) {
+        section = card.parentElement;
+        if (section.parentElement?.matches("div.html-div") && section.parentElement.children.length === 1) {
+          section = section.parentElement;
+        }
+      }
+      matches.add(section);
+    }
+    for (const section of document.querySelectorAll("[data-bf-suggested-pages]")) {
+      if (!matches.has(section)) section.removeAttribute("data-bf-suggested-pages");
+    }
+    for (const section of matches) section.setAttribute("data-bf-suggested-pages", "");
+  }
+
   // Facebook inserts and replaces sidebar sections and profile cards after navigation.
   let scanTimer;
   const observer = new MutationObserver(() => {
@@ -77,6 +99,7 @@
       scanTimer = undefined;
       markShortcuts();
       markProfileSuggestions();
+      markSuggestedPages();
       expandExploreItems();
     }, 100);
   });
@@ -86,6 +109,7 @@
   });
   markShortcuts();
   markProfileSuggestions();
+  markSuggestedPages();
   window.addEventListener("popstate", markProfileSuggestions);
 
   function apply() {
