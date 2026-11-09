@@ -12,6 +12,16 @@ A small, build-free Manifest V3 extension for Chrome and Edge. Version 0.1.0 add
 
 After editing the extension files, reload the extension on the extensions page and refresh Facebook.
 
+## Persistent Facebook menu
+
+Open Home once after updating so Better Facebook can read the expanded Shortcuts navigation. When that navigation is absent on Events, Groups, profiles, or another route, a separate menu remains on the left. Existing page-specific controls remain available beside it. On windows 1200px wide or narrower, the persistent menu uses icons with accessible labels and hover titles.
+
+Navigation labels and destinations are stored locally so the menu survives reloads. Profile.php links are replaced by the generic Your profile link; query parameters are discarded. Friends, the Your shortcuts section, and footer links are excluded. Direct entry before visiting Home uses a basic menu. Disabling Better Facebook restores the original layout. Login screens and fullscreen views do not show the extra menu.
+
+When a matching Facebook link exists, the menu activates that link to preserve in-page navigation. Otherwise it follows the destination normally and restores the menu after loading. The layout reserves space for the menu and offsets fixed left navigation panels. Facebook-specific layouts still need signed-in checks, particularly Events filters, Marketplace, and Messenger.
+
+Run `node --test facebook/tests/*.test.cjs` from the workspace root for menu-data checks. Live browser validation is still required for layout and navigation behavior.
+
 ## Scope and privacy
 
 - Runs only on `https://facebook.com/*` and `https://www.facebook.com/*`.

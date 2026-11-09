@@ -23,12 +23,15 @@
         "https://facebook.com/*"
       ],
       "css": [
-        "src/facebook.css"
+        "src/facebook.css",
+        "src/sidebar.css"
       ],
       "js": [
         "src/settings.js",
         "src/content.js",
-        "src/profile-sections.js"
+        "src/profile-sections.js",
+        "src/sidebar-model.js",
+        "src/sidebar.js"
       ],
       "run_at": "document_start"
     }

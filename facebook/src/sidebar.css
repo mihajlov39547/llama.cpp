@@ -1,0 +1,52 @@
+:root { --bf-rail-width: 220px; }
+#bf-persistent-sidebar { display: none; }
+html[data-better-facebook][data-bf-persistent-sidebar] body {
+  box-sizing: border-box !important;
+  padding-left: calc(var(--bf-original-body-padding, 0px) + var(--bf-rail-width)) !important;
+}
+html[data-better-facebook][data-bf-persistent-sidebar] [data-bf-shift-panel] {
+  translate: var(--bf-rail-width) 0 !important;
+  max-width: calc(100vw - var(--bf-rail-width)) !important;
+}
+html[data-better-facebook][data-bf-persistent-sidebar] #bf-persistent-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  position: fixed;
+  top: var(--header-height, 56px);
+  bottom: 0;
+  left: 0;
+  width: var(--bf-rail-width);
+  box-sizing: border-box;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px 10px;
+  background: var(--surface-background, var(--card-background, #fff));
+  color: var(--primary-text, #1c1e21);
+  border-right: 1px solid var(--divider, #dddfe2);
+  z-index: 1;
+  font: 600 14px/1.4 system-ui, sans-serif;
+}
+.bf-sidebar-heading { padding: 6px 12px 14px; color: var(--secondary-text, #65676b); font-size: 12px; }
+#bf-persistent-sidebar a {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 12px;
+  min-height: 44px;
+  padding: 10px 12px;
+  box-sizing: border-box;
+  border-radius: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+#bf-persistent-sidebar a:hover { background: var(--hover-overlay, #0000000d); }
+#bf-persistent-sidebar a[aria-current="page"] { background: var(--primary-deemphasized-button-background, #e7f0ff); color: var(--accent, #0866ff); }
+#bf-persistent-sidebar svg { width: 22px; height: 22px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+#bf-persistent-sidebar a span { overflow-wrap: anywhere; }
+@media (max-width: 1200px) {
+  :root { --bf-rail-width: 64px; }
+  html[data-better-facebook][data-bf-persistent-sidebar] #bf-persistent-sidebar { padding: 12px 6px; }
+  #bf-persistent-sidebar .bf-sidebar-heading, #bf-persistent-sidebar a span { display: none; }
+  #bf-persistent-sidebar a { justify-content: center; padding: 10px 4px; }
+}
