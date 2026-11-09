@@ -1,34 +1,19 @@
 <!doctype html>
-<html lang="sr-Latn">
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>UnblockCP</title>
-<link rel="stylesheet" href="popup.css">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>UnblockCP</title><link rel="stylesheet" href="popup.css"><script src="popup.js" defer></script></head>
 <body>
-  <h1>UnblockCP <span>0.2.1</span></h1>
-  <label for="mode">Režim rada (sve stranice)</label>
-  <select id="mode">
-    <option value="strong">Široko odblokiranje</option>
-    <option value="selective">Selektivno / dijagnostika</option>
-    <option value="off">Isključeno</option>
-  </select>
-  <label><input id="css" type="checkbox"> Odblokiraj selekciju CSS-om</label>
-  <p id="status" role="status"></p>
-  <dl>
-    <dt>Ctrl + Alt + 1</dt><dd>Kopiraj selekciju</dd>
-    <dt>Ctrl + Alt + 2</dt><dd>Kopiraj sav vidljivi tekst</dd>
-    <dt>Ctrl + Alt + 3</dt><dd>Nalepi samo tekst</dd>
-    <dt>Ctrl + Alt + 4</dt><dd>Nalepi sa formatiranjem</dd>
-  </dl>
-  <p>Za paste prvo klikni u polje. Formatiranje se čuva u rich text editorima; obična polja prihvataju samo tekst.</p>
-  <p class="note">Posle instalacije osveži otvorene stranice. Prečice rade dok je stranica u fokusu. Chrome interne stranice nisu podržane.</p>
-  <details>
-    <summary>Listeneri koji otkazuju događaje</summary>
-    <p>Izaberi selektivni režim, zatvori ovaj prozor i ponovi blokiranu akciju običnom prečicom ili mišem. Zatim ovde osveži listu i isključi konkretan listener.</p>
-    <p class="note">Lista pokazuje otkazivanje, ne nameru. Legitimni editori takođe otkazuju paste. Isključivanje važi do osvežavanja stranice; svaki listener možeš vratiti.</p>
-    <div class="buttons"><button id="refresh">Osveži listu</button><button id="restore">Vrati sve listenere</button></div>
-    <div id="listeners"></div>
-  </details>
-  <script src="popup.js"></script>
-</body>
-</html>
+<header><img src="icons/icon128.png" width="44" height="44" alt=""><div><h1>UnblockCP</h1><span id="version"></span></div></header>
+<p class="tagline">Copy and paste without the hassle.</p>
+<main>
+<label class="control" for="enabled"><span><strong>Unblock copy &amp; paste</strong><span id="state">Loading...</span></span><input id="enabled" type="checkbox" role="switch" disabled><span class="switch" aria-hidden="true"></span></label>
+<div class="intro"><span class="feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M15 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3"/></svg></span><p>Use <strong>Ctrl+C</strong> and <strong>Ctrl+V</strong> on sites that restrict copying and pasting.</p></div>
+<label class="selection"><span>Allow text selection</span><input id="css" type="checkbox" disabled></label>
+<p id="status" role="status" aria-live="polite" hidden></p>
+</main>
+<section class="shortcuts" aria-labelledby="shortcuts-title"><h2 id="shortcuts-title">Extra shortcuts</h2><dl>
+<div><dt><kbd>Ctrl + Alt + 1</kbd></dt><dd>Copy selection</dd></div>
+<div><dt><kbd>Ctrl + Alt + 2</kbd></dt><dd>Copy visible text</dd></div>
+<div><dt><kbd>Ctrl + Alt + 3</kbd></dt><dd>Paste plain text</dd></div>
+<div><dt><kbd>Ctrl + Alt + 4</kbd></dt><dd>Paste with formatting</dd></div>
+</dl><p class="hint">To paste, click a text field first.</p></section>
+<footer>Refresh open pages after installation.</footer>
+</body></html>

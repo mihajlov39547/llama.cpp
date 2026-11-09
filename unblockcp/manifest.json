@@ -3,26 +3,65 @@
   "name": "UnblockCP",
   "version": "0.2.1",
   "minimum_chrome_version": "119",
-  "description": "Odblokira selekciju, kopiranje i lepljenje teksta na web stranicama.",
-  "permissions": ["clipboardRead", "clipboardWrite", "storage", "scripting"],
-  "host_permissions": ["http://*/*", "https://*/*", "file:///*"],
-  "background": { "service_worker": "background.js" },
-  "action": {
-    "default_title": "UnblockCP — prečice",
-    "default_popup": "popup.html"
+  "description": "Restore text selection, copy, and paste on websites that restrict them. Includes extra shortcuts for copying and pasting text.",
+  "permissions": [
+    "clipboardRead",
+    "clipboardWrite",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*",
+    "file:///*"
+  ],
+  "background": {
+    "service_worker": "background.js"
   },
-  "content_scripts": [{
-    "matches": ["http://*/*", "https://*/*", "file:///*"],
-    "js": ["listener-registry.js"],
-    "world": "MAIN",
-    "run_at": "document_start",
-    "all_frames": true,
-    "match_origin_as_fallback": true
-  }, {
-    "matches": ["http://*/*", "https://*/*", "file:///*"],
-    "js": ["css-restorer.js", "content.js"],
-    "run_at": "document_start",
-    "all_frames": true,
-    "match_origin_as_fallback": true
-  }]
+  "action": {
+    "default_title": "UnblockCP",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*",
+        "file:///*"
+      ],
+      "js": [
+        "listener-registry.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_start",
+      "all_frames": true,
+      "match_origin_as_fallback": true
+    },
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*",
+        "file:///*"
+      ],
+      "js": [
+        "css-restorer.js",
+        "content.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true,
+      "match_origin_as_fallback": true
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
 }

@@ -1,78 +1,32 @@
 "use strict";
-const mode = document.querySelector("#mode");
+const enabled = document.querySelector("#enabled");
 const css = document.querySelector("#css");
+const state = document.querySelector("#state");
 const status = document.querySelector("#status");
-const list = document.querySelector("#listeners");
-let tabId;
-
-async function inspect(action = "report", args = [], frameId) {
-  if (tabId === undefined) throw new Error("Nema aktivne stranice.");
-  return chrome.scripting.executeScript({
-    target: frameId === undefined ? { tabId, allFrames: true } : { tabId, frameIds: [frameId] },
-    world: "MAIN",
-    func: (method, values) => {
-      const api = window.__unblockcpInspector;
-      if (!api || !["report", "setDisabled", "restore"].includes(method)) return null;
-      return api[method](...values);
-    }, args: [action, args]
-  });
+let saved = { mode: "strong", css: true };
+document.querySelector("#version").textContent = "Version " + chrome.runtime.getManifest().version;
+function render() {
+  enabled.checked = saved.mode !== "off";
+  enabled.disabled = false;
+  css.checked = saved.css;
+  css.disabled = !enabled.checked;
+  document.body.dataset.enabled = String(enabled.checked);
+  state.textContent = enabled.checked ? "Enabled on all sites" : "Paused";
 }
-
-async function refresh() {
-  list.replaceChildren();
-  const reports = await inspect();
-  let count = 0;
-  let available = false;
-  for (const { frameId, result } of reports) {
-    if (!result || !Array.isArray(result.listeners)) continue;
-    available = true;
-    for (const listener of result.listeners.slice(0, 200)) {
-      count++;
-      const row = document.createElement("div");
-      row.className = "listener";
-      const label = document.createElement("p");
-      label.textContent = `${listener.type} · ${listener.name} · ${listener.target} · frame ${frameId} · capture: ${Boolean(listener.capture)} · otkazivanja: ${listener.cancelled}`;
-      label.title = String(listener.source || "");
-      const button = document.createElement("button");
-      button.textContent = listener.disabled ? "Vrati listener" : "Isključi za ovu akciju";
-      button.addEventListener("click", () => run(async () => {
-        const result = await inspect("setDisabled", [listener.id, !listener.disabled], frameId);
-        if (!result.some(item => item.result === true)) throw new Error("Listener više nije dostupan. Osveži listu.");
-        await refresh();
-      }, button));
-      row.append(label, button);
-      list.append(row);
-    }
-  }
-  if (!available) throw new Error("Osveži stranicu da se učita nova verzija ekstenzije.");
-  status.textContent = count ? `Pronađeno listenera: ${count}.` : "Nema zabeleženih otkazivanja. Ponovi akciju u selektivnom režimu.";
+function error(message) { status.textContent = message; status.hidden = false; }
+chrome.storage.local.get("settings").then(({ settings = {} }) => {
+  saved = { ...settings, mode: ["strong", "selective", "off"].includes(settings.mode) ? settings.mode : "strong", css: settings.css !== false };
+  render();
+}).catch(() => { state.textContent = "Unavailable"; error("Unable to load settings. Please reopen the popup."); });
+async function save(event) {
+  const next = { ...saved, css: css.checked };
+  if (event.currentTarget === enabled) next.mode = enabled.checked ? "strong" : "off";
+  enabled.disabled = true;
+  css.disabled = true;
+  status.hidden = true;
+  try { await chrome.storage.local.set({ settings: next }); saved = next; }
+  catch { error("Unable to save. Please try again."); }
+  render();
 }
-
-async function run(action, button) {
-  if (button) button.disabled = true;
-  try { await action(); }
-  catch (error) { status.textContent = `Nije dostupno: ${error.message}`; }
-  finally { if (button) button.disabled = false; }
-}
-
-async function save() {
-  await chrome.storage.local.set({ settings: { mode: mode.value, css: css.checked } });
-  status.textContent = "Podešavanja su sačuvana za sve stranice.";
-}
-mode.addEventListener("change", () => run(save));
-css.addEventListener("change", () => run(save));
-document.querySelector("#refresh").addEventListener("click", event => run(refresh, event.currentTarget));
-document.querySelector("#restore").addEventListener("click", event => run(async () => {
-  await inspect("restore");
-  await refresh();
-}, event.currentTarget));
-
-run(async () => {
-  const [{ settings = {} }, tabs] = await Promise.all([
-    chrome.storage.local.get("settings"), chrome.tabs.query({ active: true, currentWindow: true })
-  ]);
-  mode.value = settings.mode || "strong";
-  css.checked = settings.css !== false;
-  tabId = tabs[0]?.id;
-  await refresh();
-});
+enabled.addEventListener("change", save);
+css.addEventListener("change", save);

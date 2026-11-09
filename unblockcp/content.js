@@ -87,18 +87,18 @@
     const fieldSelected = element && typeof element.selectionStart === "number" &&
       element.selectionEnd > element.selectionStart;
     if (!fieldSelected && !window.getSelection()?.toString()) {
-      notify("Prvo selektuj tekst.");
+      notify("Select some text first.");
       return;
     }
     // Native copy preserves both text/plain and text/html when available.
     const success = document.execCommand("copy");
-    notify(success ? "Selekcija je kopirana." : "Kopiranje nije uspelo u ovom polju.");
+    notify(success ? "Selection copied." : "Unable to copy from this field.");
   }
 
   function copyAll() {
     const text = document.body?.innerText || "";
     if (!text.trim()) {
-      notify("Na stranici nema dostupnog teksta.");
+      notify("No text is available on this page.");
       return;
     }
     const active = focusedElement();
@@ -127,12 +127,12 @@
       }
       if (fieldRange) active.setSelectionRange(...fieldRange);
     }
-    notify(success ? "Tekst stranice je kopiran." : "Kopiranje nije uspelo.");
+    notify(success ? "Page text copied." : "Unable to copy.");
   }
 
   function paste(asPlainText) {
     if (!editable(focusedElement())) {
-      notify("Prvo klikni u polje za unos teksta.");
+      notify("Click a text field first.");
       return;
     }
     plainPaste = asPlainText;
@@ -147,8 +147,8 @@
       plainPaste = false;
     }
     notify(success
-      ? (asPlainText ? "Tekst je nalepljen bez formatiranja." : "Sadržaj je nalepljen sa dostupnim formatiranjem.")
-      : "Lepljenje nije uspelo ili je clipboard prazan. Probaj Ctrl+V.");
+      ? (asPlainText ? "Pasted as plain text." : "Pasted with available formatting.")
+      : "Unable to paste. Try Ctrl+V.");
   }
 
   function shortcut(event) {
@@ -172,7 +172,7 @@
           else paste(action === "3");
         } catch (error) {
           console.warn("UnblockCP:", error);
-          notify("Browser nije dozvolio ovu operaciju.");
+          notify("Your browser could not complete this action.");
         }
         return;
       }
