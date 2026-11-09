@@ -1,0 +1,128 @@
+/* Opt-in root attributes make disabling immediate and fully reversible.
+   Preserve Facebook's own surface/text colors, including its dark theme. */
+html[data-better-facebook] {
+  --card-corner-radius: 16px;
+  --button-corner-radius: 10px;
+  --input-corner-radius: 10px;
+}
+
+/* Preserve Facebook's measured layout, but hide it only once our bar exists.
+   Changing its measuring placeholders or tab geometry causes resize loops. */
+html[data-better-facebook] [role="tablist"]:has(+ .bf-profile-sections),
+html[data-better-facebook] [role="tablist"]:has(+ .bf-profile-sections) * {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+.bf-profile-sections { display: none; }
+html[data-better-facebook] .bf-profile-sections {
+  position: relative;
+  margin-top: calc(-1 * var(--bf-native-height, 0px));
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 0 10px;
+}
+html[data-better-facebook] .bf-profile-sections :is(a, button) {
+  display: inline-flex;
+  align-items: center;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--secondary-text, #65676b);
+  font: 600 15px/1.4 system-ui, sans-serif;
+  text-decoration: none;
+  cursor: pointer;
+}
+html[data-better-facebook] .bf-profile-sections :is(a, button):hover {
+  background: var(--hover-overlay, rgb(128 128 128 / 12%));
+}
+html[data-better-facebook] .bf-profile-sections [aria-current="page"] {
+  color: var(--accent, #0866ff);
+  box-shadow: inset 0 -3px var(--accent, #0866ff);
+}
+
+/* Profile-page suggestions are identified by their heading in content.js. */
+html[data-better-facebook] [data-bf-profile-suggestions] {
+  display: none !important;
+}
+
+/* Keep the explore list expanded via content.js; hide only its toggle controls. */
+html[data-better-facebook] [role="button"]:is(
+  [aria-label="See more explore items"],
+  [aria-label="See less explore items"]
+),
+html[data-better-facebook] div:has(> div:only-child > div:only-child > [role="button"]:only-child:is(
+  [aria-label="See more explore items"],
+  [aria-label="See less explore items"]
+)) {
+  display: none !important;
+}
+
+/* Hide the Facebook footer and its dedicated wrapper, including its spacing. */
+html[data-better-facebook] footer[role="contentinfo"][aria-label="Facebook"],
+html[data-better-facebook] div:has(> footer[role="contentinfo"][aria-label="Facebook"]:only-child) {
+  display: none !important;
+}
+
+/* The content script identifies the complete Your shortcuts section by heading. */
+html[data-better-facebook] [data-bf-shortcuts] {
+  display: none !important;
+}
+
+/* Hide the Friends navigation item without removing it from the DOM.
+   Match its destination instead of Facebook's generated class names. */
+html[data-better-facebook] li:has(a[role="link"]:is(
+  [href="/friends/"],
+  [href="/friends"],
+  [href="https://www.facebook.com/friends/"],
+  [href="https://www.facebook.com/friends"]
+)) {
+  display: none !important;
+}
+
+/* Hide the whole suggestions card, including its heading and See all button.
+   The direct-child chain targets the supplied card wrapper, not feed ancestors.
+   CSS also matches cards inserted later without deleting any page elements. */
+html[data-better-facebook] div:has(
+  > div[style*="--card-corner-radius"] > div > div > div
+  > [role="region"][aria-label="People you may know"]
+) {
+  display: none !important;
+}
+
+html[data-better-facebook] [role="main"] [role="feed"] > [role="article"],
+html[data-better-facebook] [role="main"] [role="feed"] > div > [role="article"] {
+  border-radius: 16px !important;
+  box-shadow: 0 3px 18px rgb(0 0 0 / 7%) !important;
+  margin-block-end: 18px !important;
+}
+
+html[data-better-facebook] [role="main"] [data-ad-preview="message"],
+html[data-better-facebook] [role="main"] [data-ad-comet-preview="message"] {
+  line-height: 1.6 !important;
+}
+
+html[data-better-facebook][data-bf-text="comfortable"] [role="main"] [data-ad-preview="message"],
+html[data-better-facebook][data-bf-text="comfortable"] [role="main"] [data-ad-comet-preview="message"] {
+  font-size: 17px !important;
+}
+
+html[data-better-facebook][data-bf-text="large"] [role="main"] [data-ad-preview="message"],
+html[data-better-facebook][data-bf-text="large"] [role="main"] [data-ad-comet-preview="message"] {
+  font-size: 19px !important;
+}
+
+html[data-better-facebook] :is(a, button, [role="button"], input, textarea):focus-visible {
+  outline: 3px solid var(--primary-button-background, #0866ff) !important;
+  outline-offset: 3px !important;
+}
+
+/* Visibility preserves Facebook's layout and leaves navigation available.
+   Users can restore complementary sidebars immediately from the popup. */
+@media (min-width: 1100px) {
+  html[data-better-facebook][data-bf-focus] [role="complementary"] {
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+}

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Better Facebook</title>
+  <link rel="stylesheet" href="popup.css">
+  <script src="settings.js" defer></script>
+  <script src="popup.js" defer></script>
+</head>
+<body>
+  <header>
+    <span class="mark" aria-hidden="true">bf.</span>
+    <div><h1>Better Facebook</h1><p>A little calmer. A little clearer.</p></div>
+  </header>
+  <main>
+    <label class="row primary"><span>Make yourself at home<small>Enable Better Facebook</small></span><input id="enabled" type="checkbox" disabled></label>
+    <fieldset id="preferences" disabled>
+      <legend>Your preferences</legend>
+      <label class="row"><span>Focus mode<small>Hide sidebars on wide screens</small></span><input id="focus" type="checkbox"></label>
+      <label class="reading" for="textSize">Post text size</label>
+      <select id="textSize"><option value="default">Original size</option><option value="comfortable">Comfortable · 17px</option><option value="large">Large · 19px</option></select>
+    </fieldset>
+    <p class="note">Softer cards and clearer keyboard focus. Works with Facebook’s light and dark themes.</p>
+    <p id="status" role="status" aria-live="polite">Loading preferences…</p>
+  </main>
+  <footer>Made for your feed. Settings stay on this device.</footer>
+</body>
+</html>

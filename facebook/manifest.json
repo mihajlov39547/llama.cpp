@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Better Facebook",
+  "version": "0.1.0",
+  "description": "A calmer Facebook with softer cards, comfortable reading, and optional focus mode.",
+  "permissions": ["storage"],
+  "action": {
+    "default_title": "Better Facebook",
+    "default_popup": "src/popup.html"
+  },
+  "content_scripts": [{
+    "matches": ["https://www.facebook.com/*", "https://facebook.com/*"],
+    "css": ["src/facebook.css"],
+    "js": ["src/settings.js", "src/content.js", "src/profile-sections.js"],
+    "run_at": "document_start"
+  }]
+}

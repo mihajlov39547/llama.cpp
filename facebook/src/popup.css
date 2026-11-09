@@ -1,0 +1,29 @@
+:root { color-scheme: light dark; font: 14px/1.5 system-ui, sans-serif; color: #1c293c; background: #f6f8fc; }
+* { box-sizing: border-box; }
+body { width: 350px; margin: 0; }
+header { display: flex; align-items: center; gap: 12px; padding: 24px 22px 20px; }
+.mark { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; background: #245de5; color: white; font-size: 23px; font-weight: 800; letter-spacing: -2px; }
+h1 { margin: 0; font-size: 19px; letter-spacing: -.5px; }
+header p { margin: 2px 0 0; font-size: 12px; color: #637088; }
+main { padding: 0 22px; }
+.row { display: flex; justify-content: space-between; align-items: center; gap: 12px; cursor: pointer; }
+.primary { padding: 16px; background: #e9efff; border: 1px solid #d4e0ff; border-radius: 14px; font-weight: 600; }
+small { display: block; font-size: 11px; font-weight: 400; color: #637088; margin-top: 3px; }
+input[type="checkbox"] { width: 19px; height: 19px; accent-color: #245de5; flex-shrink: 0; cursor: pointer; }
+fieldset { border: 0; margin: 22px 0 0; padding: 0; }
+legend { color: #637088; font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 14px; }
+fieldset:disabled { opacity: .5; }
+.reading { display: block; margin: 20px 0 8px; }
+select { width: 100%; padding: 10px 12px; border: 1px solid #d5ddea; border-radius: 10px; color: inherit; background: #fff; font: inherit; }
+:is(input, select):focus-visible { outline: 3px solid #245de5; outline-offset: 3px; }
+.note { margin: 20px 0 0; color: #637088; font-size: 12px; }
+#status { min-height: 18px; color: #245de5; font-size: 12px; margin: 12px 0; }
+footer { padding: 14px 22px; border-top: 1px solid #e0e6f0; color: #637088; font-size: 11px; }
+@media (prefers-color-scheme: dark) {
+  :root { color: #edf2fc; background: #17202f; }
+  .primary { background: #223353; border-color: #344b73; }
+  header p, small, legend, .note, footer { color: #a9b8ce; }
+  select { background: #202d40; border-color: #42516a; }
+  footer { border-color: #344158; }
+  #status { color: #99b9ff; }
+}
