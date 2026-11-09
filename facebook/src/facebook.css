@@ -6,6 +6,24 @@ html[data-better-facebook] {
   --input-corner-radius: 10px;
 }
 
+/* Collapse the supplied cover-photo container to a transparent 20px spacer.
+   Match the direct edit control so profile details outside the cover stay intact. */
+html[data-better-facebook] div:has(> [role="button"][aria-label="Edit cover photo"]) {
+  box-sizing: border-box !important;
+  height: 20px !important;
+  min-height: 20px !important;
+  max-height: 20px !important;
+  padding: 0 !important;
+  margin-block: 0 !important;
+  overflow: hidden !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+html[data-better-facebook] div:has(> [role="button"][aria-label="Edit cover photo"]) > * {
+  display: none !important;
+}
+
 /* Preserve Facebook's measured layout, but hide it only once our bar exists.
    Changing its measuring placeholders or tab geometry causes resize loops. */
 html[data-better-facebook] [role="tablist"]:has(+ .bf-profile-sections),
