@@ -8,7 +8,7 @@ A small, build-free Manifest V3 extension for Chrome and Edge. Version 0.1.0 add
 2. Enable **Developer mode** and select **Load unpacked**.
 3. Select `C:\llama.cpp\facebook`.
 4. Refresh existing Facebook tabs, then pin **Better Facebook** to your toolbar.
-5. Open its toolbar popup to adjust preferences. Changes apply immediately to open tabs.
+5. Open its toolbar popup to enable or pause Better Facebook. Changes apply immediately to open tabs. The compact English popup summarizes the cleaner layout and hidden Friends navigation/recommendations; previously saved text-size and focus preferences are preserved.
 
 After editing the extension files, reload the extension on the extensions page and refresh Facebook.
 

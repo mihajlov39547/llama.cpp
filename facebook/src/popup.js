@@ -1,41 +1,32 @@
 (() => {
   const { normalize } = globalThis.BetterFacebook;
   const enabled = document.getElementById("enabled");
-  const focus = document.getElementById("focus");
-  const textSize = document.getElementById("textSize");
-  const preferences = document.getElementById("preferences");
+  const state = document.getElementById("state");
   const status = document.getElementById("status");
   let saved = normalize();
-
-  function render(settings) {
-    enabled.checked = settings.enabled;
-    focus.checked = settings.focus;
-    textSize.value = settings.textSize;
+  document.getElementById("version").textContent = "Version " + chrome.runtime.getManifest().version;
+  function render() {
+    enabled.checked = saved.enabled;
     enabled.disabled = false;
-    preferences.disabled = !settings.enabled;
+    document.body.dataset.enabled = String(saved.enabled);
+    state.textContent = saved.enabled ? "Enabled" : "Paused";
   }
-
-  chrome.storage.local.get("betterFacebook").then((result) => {
+  function showError(message) { status.textContent = message; status.hidden = false; }
+  chrome.storage.local.get("betterFacebook").then(result => {
     saved = normalize(result.betterFacebook);
-    render(saved);
-    status.textContent = "Ready. Changes apply to open Facebook tabs.";
+    render();
   }).catch(() => {
-    status.textContent = "Could not load settings. Reopen this popup to retry.";
+    state.textContent = "Unavailable";
+    showError("Unable to load settings. Please reopen the popup.");
   });
-
-  for (const control of [enabled, focus, textSize]) {
-    control.addEventListener("change", async () => {
-      const next = normalize({ enabled: enabled.checked, focus: focus.checked, textSize: textSize.value });
-      enabled.disabled = true;
-      preferences.disabled = true;
-      try {
-        await chrome.storage.local.set({ betterFacebook: next });
-        saved = next;
-        status.textContent = next.enabled ? "Saved. Your feed is ready." : "Disabled. Facebook’s original styling is restored.";
-      } catch {
-        status.textContent = "Could not save. Please try again.";
-      }
-      render(saved);
-    });
-  }
+  enabled.addEventListener("change", async () => {
+    const next = { ...saved, enabled: enabled.checked };
+    enabled.disabled = true;
+    status.hidden = true;
+    try {
+      await chrome.storage.local.set({ betterFacebook: next });
+      saved = next;
+    } catch { showError("Unable to save. Please try again."); }
+    render();
+  });
 })();
