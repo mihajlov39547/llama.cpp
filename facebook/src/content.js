@@ -91,6 +91,22 @@
     for (const section of matches) section.setAttribute("data-bf-suggested-pages", "");
   }
 
+  function markReelsCards() {
+    const matches = new Set();
+    for (const heading of document.querySelectorAll("h3")) {
+      if (heading.textContent.trim().toLowerCase() !== "reels") continue;
+      const card = heading.closest('div[style*="--card-corner-radius"]');
+      if (!card) continue;
+      // Hide the dedicated card wrapper, including its decorative overlay.
+      const section = card.parentElement?.matches("div.html-div") ? card.parentElement : card;
+      matches.add(section);
+    }
+    for (const section of document.querySelectorAll("[data-bf-reels-card]")) {
+      if (!matches.has(section)) section.removeAttribute("data-bf-reels-card");
+    }
+    for (const section of matches) section.setAttribute("data-bf-reels-card", "");
+  }
+
   // Facebook inserts and replaces sidebar sections and profile cards after navigation.
   let scanTimer;
   const observer = new MutationObserver(() => {
@@ -100,6 +116,7 @@
       markShortcuts();
       markProfileSuggestions();
       markSuggestedPages();
+      markReelsCards();
       expandExploreItems();
     }, 100);
   });
@@ -110,6 +127,7 @@
   markShortcuts();
   markProfileSuggestions();
   markSuggestedPages();
+  markReelsCards();
   window.addEventListener("popstate", markProfileSuggestions);
 
   function apply() {
