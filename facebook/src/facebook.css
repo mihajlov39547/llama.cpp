@@ -61,7 +61,8 @@ html[data-better-facebook] .bf-profile-sections [aria-current="page"] {
 }
 
 /* Profile-page suggestions are identified by their heading in content.js. */
-html[data-better-facebook] [data-bf-profile-suggestions] {
+html[data-better-facebook] [data-bf-profile-suggestions],
+html[data-better-facebook] [data-bf-suggested-pages] {
   display: none !important;
 }
 
