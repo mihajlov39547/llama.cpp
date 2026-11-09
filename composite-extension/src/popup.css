@@ -1,7 +1,24 @@
-:root { color-scheme: light dark; font: 13px/1.5 system-ui, sans-serif; }
-body { width: 330px; margin: 0; padding: 18px; box-sizing: border-box; }
-h1 { font-size: 18px; margin: 0; }
-h2 { font-size: 14px; margin: 0; }
-section { border: 1px solid #718593; border-radius: 10px; padding: 12px; margin-top: 12px; }
-p { overflow-wrap: anywhere; margin: 8px 0 0; }
-.muted { opacity: .75; }
+:root { color-scheme: light dark; font: 13px/1.5 system-ui, sans-serif; --bg: #f8f9fc; --surface: #fff; --text: #24283d; --muted: #6d7287; --line: #e6e7f0; --accent: #7253d8; --tint: #f0ecfc; }
+* { box-sizing: border-box; }
+body { width: 350px; margin: 0; padding: 22px; color: var(--text); background: var(--bg); }
+header { display: flex; align-items: center; gap: 12px; }
+header img { flex: none; }
+h1 { margin: 0; font-size: 18px; line-height: 1.35; letter-spacing: -.45px; }
+#version { font-size: 11px; color: var(--muted); }
+.tagline { margin: 18px 0; font-size: 14px; color: var(--muted); }
+main { background: var(--surface); border: 1px solid var(--line); border-radius: 15px; overflow: hidden; }
+.status { display: flex; align-items: center; gap: 11px; padding: 17px; border-bottom: 1px solid var(--line); }
+.status strong { font-size: 13px; font-weight: 650; }
+.status p { margin: 2px 0 0; font-size: 11px; color: var(--muted); }
+.dot { width: 8px; height: 8px; margin: 0 4px; border-radius: 50%; background: #239980; box-shadow: 0 0 0 4px #23998015; }
+.features { display: grid; gap: 19px; padding: 21px 17px; }
+.feature { display: flex; align-items: flex-start; gap: 11px; }
+.feature-icon { display: grid; place-items: center; width: 30px; height: 30px; flex: none; border-radius: 9px; color: var(--accent); background: var(--tint); }
+svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+h2 { font-size: 12px; margin: 0 0 3px; font-weight: 650; }
+.feature p { margin: 0; color: var(--muted); font-size: 11px; }
+footer { margin-top: 17px; color: var(--muted); text-align: center; font-size: 10px; }
+@media (prefers-color-scheme: dark) {
+:root { --bg: #181725; --surface: #232236; --text: #f0eefb; --muted: #aca9c3; --line: #36344b; --accent: #bba5ff; --tint: #35304f; }
+.dot { background: #68d8b5; }
+}

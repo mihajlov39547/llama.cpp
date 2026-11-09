@@ -1,4 +1,4 @@
-# Composite Extension
+# Hide Adds
 
 Standalone Chrome Manifest V3 extension, following the existing prompt-enhancer project's plain JavaScript structure. No build, model server, dependencies or configuration needed. Prompt Enhancer remains a separate extension.
 
@@ -69,4 +69,4 @@ Implementation references: [Chrome network rules](https://developer.chrome.com/d
 
 ## Vignette overlays (0.3.1)
 
-Google vignette/interstitial `ins` wrappers are hidden as a whole. A small content script reapplies inline `display:none!important` when an ad script rewrites inline styles, including the supplied Politika Interstitial slot. It removes the exact `#google_vignette` fragment with replaceState (preserving history state, path and query) when a matching overlay exists, and restores inline overflow locks on the document/body unless a visible ordinary modal is open. Ad elements remain in the DOM and Google requests are still allowed. No extra permissions are required. Reload Composite Extension and refresh existing tabs once after upgrading.
+Google vignette/interstitial `ins` wrappers are hidden as a whole. A small content script reapplies inline `display:none!important` when an ad script rewrites inline styles, including the supplied Politika Interstitial slot. It removes the exact `#google_vignette` fragment with replaceState (preserving history state, path and query) when a matching overlay exists, and restores inline overflow locks on the document/body unless a visible ordinary modal is open. Ad elements remain in the DOM and Google requests are still allowed. No extra permissions are required. Reload Hide Adds and refresh existing tabs once after upgrading.
