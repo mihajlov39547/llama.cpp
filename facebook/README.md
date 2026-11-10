@@ -14,6 +14,8 @@ After editing the extension files, reload the extension on the extensions page a
 
 ## Persistent Facebook menu
 
+The persistent menu uses the original 36px Facebook artwork supplied in `facebook_sidebar_icons/icons.json`. WebP resources are bundled under `icons/sidebar`, with no runtime CDN requests. Icons are matched by destination or label; Home, Your profile, and unknown items retain vector fallbacks. Only the bundled sidebar images are exposed to Facebook through the manifest.
+
 Open Home once after updating so Better Facebook can read the expanded Shortcuts navigation. When that navigation is absent on Events, Groups, profiles, or another route, a separate menu remains on the left. Existing page-specific controls remain available beside it. On windows 1200px wide or narrower, the persistent menu uses icons with accessible labels and hover titles.
 
 Navigation labels and destinations are stored locally so the menu survives reloads. Profile.php links are replaced by the generic Your profile link; query parameters are discarded. Friends, the Your shortcuts section, and footer links are excluded. Direct entry before visiting Home uses a basic menu. Disabling Better Facebook restores the original layout. Login screens and fullscreen views do not show the extra menu.

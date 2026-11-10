@@ -107,6 +107,23 @@
     for (const section of matches) section.setAttribute("data-bf-reels-card", "");
   }
 
+  function markFriendRequests() {
+    const matches = new Set();
+    for (const heading of document.querySelectorAll("h3")) {
+      if (heading.textContent.trim().toLowerCase() !== "friend requests") continue;
+      // This is the dedicated requests container in the supplied sidebar markup.
+      // Require its Friends link as well, rather than hiding a larger sidebar.
+      const section = heading.closest("div.x1uc6qws");
+      if (section?.querySelector('a[href="/friends/"], a[href="https://www.facebook.com/friends/"]')) {
+        matches.add(section);
+      }
+    }
+    for (const section of document.querySelectorAll("[data-bf-friend-requests]")) {
+      if (!matches.has(section)) section.removeAttribute("data-bf-friend-requests");
+    }
+    for (const section of matches) section.setAttribute("data-bf-friend-requests", "");
+  }
+
   // Facebook inserts and replaces sidebar sections and profile cards after navigation.
   let scanTimer;
   const observer = new MutationObserver(() => {
@@ -117,6 +134,7 @@
       markProfileSuggestions();
       markSuggestedPages();
       markReelsCards();
+      markFriendRequests();
       expandExploreItems();
     }, 100);
   });
@@ -128,6 +146,7 @@
   markProfileSuggestions();
   markSuggestedPages();
   markReelsCards();
+  markFriendRequests();
   window.addEventListener("popstate", markProfileSuggestions);
 
   function apply() {

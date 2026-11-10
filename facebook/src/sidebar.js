@@ -74,15 +74,27 @@
       link.title = item.label;
       link.setAttribute("aria-label", item.label);
       if (active(item.href, location.href)) link.setAttribute("aria-current", "page");
-      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      svg.setAttribute("viewBox", "0 0 24 24");
-      svg.setAttribute("aria-hidden", "true");
-      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      path.setAttribute("d", symbols[item.label] || "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z");
-      svg.append(path);
+      const artwork = globalThis.BetterFacebookSidebarIcons.resolve(item);
+      let icon;
+      if (artwork) {
+        icon = document.createElement("i");
+        icon.className = "bf-sidebar-icon";
+        icon.setAttribute("aria-hidden", "true");
+        icon.style.backgroundImage = `url("${chrome.runtime.getURL(artwork.file)}")`;
+        icon.style.backgroundPosition = artwork.position;
+      } else {
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("viewBox", "0 0 24 24");
+        svg.setAttribute("aria-hidden", "true");
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", symbols[item.label] || "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z");
+        svg.append(path);
+        icon = svg;
+      }
       const label = document.createElement("span");
+      label.className = "bf-sidebar-label";
       label.textContent = item.label;
-      link.append(svg, label);
+      link.append(icon, label);
       rail.append(link);
     }
   }

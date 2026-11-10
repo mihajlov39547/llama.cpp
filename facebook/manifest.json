@@ -31,6 +31,7 @@
         "src/content.js",
         "src/profile-sections.js",
         "src/sidebar-model.js",
+        "src/sidebar-icons.js",
         "src/sidebar.js"
       ],
       "run_at": "document_start"
@@ -41,5 +42,16 @@
     "32": "icons/icon32.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "icons/sidebar/*.webp"
+      ],
+      "matches": [
+        "https://www.facebook.com/*",
+        "https://facebook.com/*"
+      ]
+    }
+  ]
 }

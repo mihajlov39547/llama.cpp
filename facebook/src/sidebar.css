@@ -1,4 +1,4 @@
-:root { --bf-rail-width: 220px; }
+:root { --bf-rail-width: 280px; }
 #bf-persistent-sidebar { display: none; }
 html[data-better-facebook][data-bf-persistent-sidebar] body {
   box-sizing: border-box !important;
@@ -33,8 +33,8 @@ html[data-better-facebook][data-bf-persistent-sidebar] #bf-persistent-sidebar {
   align-items: center;
   flex-shrink: 0;
   gap: 12px;
-  min-height: 44px;
-  padding: 10px 12px;
+  min-height: 52px;
+  padding: 8px;
   box-sizing: border-box;
   border-radius: 10px;
   color: inherit;
@@ -42,11 +42,12 @@ html[data-better-facebook][data-bf-persistent-sidebar] #bf-persistent-sidebar {
 }
 #bf-persistent-sidebar a:hover { background: var(--hover-overlay, #0000000d); }
 #bf-persistent-sidebar a[aria-current="page"] { background: var(--primary-deemphasized-button-background, #e7f0ff); color: var(--accent, #0866ff); }
-#bf-persistent-sidebar svg { width: 22px; height: 22px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+#bf-persistent-sidebar .bf-sidebar-icon { display: block; width: 36px; height: 36px; flex: 0 0 36px; background-repeat: no-repeat; background-size: auto; }
+#bf-persistent-sidebar svg { width: 36px; height: 36px; padding: 6px; box-sizing: border-box; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 #bf-persistent-sidebar a span { overflow-wrap: anywhere; }
 @media (max-width: 1200px) {
   :root { --bf-rail-width: 64px; }
   html[data-better-facebook][data-bf-persistent-sidebar] #bf-persistent-sidebar { padding: 12px 6px; }
-  #bf-persistent-sidebar .bf-sidebar-heading, #bf-persistent-sidebar a span { display: none; }
-  #bf-persistent-sidebar a { justify-content: center; padding: 10px 4px; }
+  #bf-persistent-sidebar .bf-sidebar-heading, #bf-persistent-sidebar .bf-sidebar-label { display: none; }
+  #bf-persistent-sidebar a { justify-content: center; padding: 8px 4px; }
 }
