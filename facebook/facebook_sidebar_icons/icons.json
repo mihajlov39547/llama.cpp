@@ -1,0 +1,131 @@
+[
+  {
+    "name": "Meta AI",
+    "slug": "meta-ai",
+    "type": "sprite",
+    "url": "https://static.xx.fbcdn.net/rsrc.php/yn/r/CHMV2nOM9jW.webp",
+    "position": "0 0"
+  },
+  {
+    "name": "Friends",
+    "slug": "friends",
+    "type": "sprite",
+    "url": "https://static.xx.fbcdn.net/rsrc.php/yz/r/wZBdW_qnLOB.webp",
+    "position": "0 -851px"
+  },
+  {
+    "name": "Creator Dashboard",
+    "slug": "creator-dashboard",
+    "type": "sprite",
+    "url": "https://static.xx.fbcdn.net/rsrc.php/yz/r/wZBdW_qnLOB.webp",
+    "position": "0 -1332px"
+  },
+  {
+    "name": "Memories",
+    "slug": "memories",
+    "type": "sprite",
+    "url": "https://static.xx.fbcdn.net/rsrc.php/yz/r/wZBdW_qnLOB.webp",
+    "position": "0 -1221px"
+  },
+  {
+    "name": "Saved",
+    "slug": "saved",
+    "type": "sprite",
+    "url": "https://static.xx.fbcdn.net/rsrc.php/yz/r/wZBdW_qnLOB.webp",
+    "position": "0 -518px"
+  },
+  {
+    "name": "Groups",
+    "slug": "groups",
+    "type": "sprite",
+    "url": "https://static.xx.fbcdn.net/rsrc.php/yz/r/wZBdW_qnLOB.webp",
+    "position": "0 -185px"
+  },
+  {
+    "name": "Reels",
+    "slug": "reels",
+    "type": "sprite",
+    "url": "https://static.xx.fbcdn.net/rsrc.php/yz/r/wZBdW_qnLOB.webp",
+    "position": "0 -111px"
+  },
+  {
+    "name": "Ad Center",
+    "slug": "ad-center",
+    "type": "sprite",
+    "url": "https://static.xx.fbcdn.net/rsrc.php/yz/r/wZBdW_qnLOB.webp",
+    "position": "0px -1036px"
+  },
+  {
+    "name": "Ads Manager",
+    "slug": "ads-manager",
+    "type": "sprite",
+    "url": "https://static.xx.fbcdn.net/rsrc.php/yz/r/wZBdW_qnLOB.webp",
+    "position": "0px -407px"
+  },
+  {
+    "name": "Birthdays",
+    "slug": "birthdays",
+    "type": "sprite",
+    "url": "https://static.xx.fbcdn.net/rsrc.php/yL/r/_1B5IH4MpiR.webp",
+    "position": "0px 0px"
+  },
+  {
+    "name": "Events",
+    "slug": "events",
+    "type": "sprite",
+    "url": "https://static.xx.fbcdn.net/rsrc.php/yz/r/wZBdW_qnLOB.webp",
+    "position": "0px -666px"
+  },
+  {
+    "name": "Feeds",
+    "slug": "feeds",
+    "type": "image",
+    "url": "https://static.xx.fbcdn.net/rsrc.php/yd/r/6H6EFrx5Jjl.webp"
+  },
+  {
+    "name": "Gaming Video",
+    "slug": "gaming-video",
+    "type": "image",
+    "url": "https://static.xx.fbcdn.net/rsrc.php/yT/r/JYr05Vf7xjV.webp"
+  },
+  {
+    "name": "Marketplace",
+    "slug": "marketplace",
+    "type": "sprite",
+    "url": "https://static.xx.fbcdn.net/rsrc.php/yz/r/wZBdW_qnLOB.webp",
+    "position": "0px -999px"
+  },
+  {
+    "name": "Messenger",
+    "slug": "messenger",
+    "type": "sprite",
+    "url": "https://static.xx.fbcdn.net/rsrc.php/yF/r/pyL74GbHm4L.webp",
+    "position": "0px 0px"
+  },
+  {
+    "name": "Orders and payments",
+    "slug": "orders-and-payments",
+    "type": "image",
+    "url": "https://static.xx.fbcdn.net/rsrc.php/y_/r/R4eauTzM8dl.webp"
+  },
+  {
+    "name": "Pages",
+    "slug": "pages",
+    "type": "sprite",
+    "url": "https://static.xx.fbcdn.net/rsrc.php/yz/r/wZBdW_qnLOB.webp",
+    "position": "0px -333px"
+  },
+  {
+    "name": "Play games",
+    "slug": "play-games",
+    "type": "sprite",
+    "url": "https://static.xx.fbcdn.net/rsrc.php/yz/r/wZBdW_qnLOB.webp",
+    "position": "0px -259px"
+  },
+  {
+    "name": "Your Ad Activity",
+    "slug": "your-ad-activity",
+    "type": "image",
+    "url": "https://static.xx.fbcdn.net/rsrc.php/y-/r/ITvoZIONvPL.webp"
+  }
+]

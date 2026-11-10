@@ -1,0 +1,21 @@
+/* Facebook sidebar icons extracted from supplied HTML; all icons are 36 x 36 pixels. */
+.fb-icon { display:inline-block; width:36px; height:36px; flex:0 0 36px; background-repeat:no-repeat; background-size:auto; vertical-align:middle; }
+.fb-icon--meta-ai { background-image: url("https://static.xx.fbcdn.net/rsrc.php/yn/r/CHMV2nOM9jW.webp"); background-position: 0 0; }
+.fb-icon--friends { background-image: url("https://static.xx.fbcdn.net/rsrc.php/yz/r/wZBdW_qnLOB.webp"); background-position: 0 -851px; }
+.fb-icon--creator-dashboard { background-image: url("https://static.xx.fbcdn.net/rsrc.php/yz/r/wZBdW_qnLOB.webp"); background-position: 0 -1332px; }
+.fb-icon--memories { background-image: url("https://static.xx.fbcdn.net/rsrc.php/yz/r/wZBdW_qnLOB.webp"); background-position: 0 -1221px; }
+.fb-icon--saved { background-image: url("https://static.xx.fbcdn.net/rsrc.php/yz/r/wZBdW_qnLOB.webp"); background-position: 0 -518px; }
+.fb-icon--groups { background-image: url("https://static.xx.fbcdn.net/rsrc.php/yz/r/wZBdW_qnLOB.webp"); background-position: 0 -185px; }
+.fb-icon--reels { background-image: url("https://static.xx.fbcdn.net/rsrc.php/yz/r/wZBdW_qnLOB.webp"); background-position: 0 -111px; }
+.fb-icon--ad-center { background-image: url("https://static.xx.fbcdn.net/rsrc.php/yz/r/wZBdW_qnLOB.webp"); background-position: 0px -1036px; }
+.fb-icon--ads-manager { background-image: url("https://static.xx.fbcdn.net/rsrc.php/yz/r/wZBdW_qnLOB.webp"); background-position: 0px -407px; }
+.fb-icon--birthdays { background-image: url("https://static.xx.fbcdn.net/rsrc.php/yL/r/_1B5IH4MpiR.webp"); background-position: 0px 0px; }
+.fb-icon--events { background-image: url("https://static.xx.fbcdn.net/rsrc.php/yz/r/wZBdW_qnLOB.webp"); background-position: 0px -666px; }
+.fb-icon--feeds { background-image: url("https://static.xx.fbcdn.net/rsrc.php/yd/r/6H6EFrx5Jjl.webp"); background-position: 0 0; }
+.fb-icon--gaming-video { background-image: url("https://static.xx.fbcdn.net/rsrc.php/yT/r/JYr05Vf7xjV.webp"); background-position: 0 0; }
+.fb-icon--marketplace { background-image: url("https://static.xx.fbcdn.net/rsrc.php/yz/r/wZBdW_qnLOB.webp"); background-position: 0px -999px; }
+.fb-icon--messenger { background-image: url("https://static.xx.fbcdn.net/rsrc.php/yF/r/pyL74GbHm4L.webp"); background-position: 0px 0px; }
+.fb-icon--orders-and-payments { background-image: url("https://static.xx.fbcdn.net/rsrc.php/y_/r/R4eauTzM8dl.webp"); background-position: 0 0; }
+.fb-icon--pages { background-image: url("https://static.xx.fbcdn.net/rsrc.php/yz/r/wZBdW_qnLOB.webp"); background-position: 0px -333px; }
+.fb-icon--play-games { background-image: url("https://static.xx.fbcdn.net/rsrc.php/yz/r/wZBdW_qnLOB.webp"); background-position: 0px -259px; }
+.fb-icon--your-ad-activity { background-image: url("https://static.xx.fbcdn.net/rsrc.php/y-/r/ITvoZIONvPL.webp"); background-position: 0 0; }
